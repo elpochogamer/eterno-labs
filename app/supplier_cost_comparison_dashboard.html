@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eterno — Decisión de compra (USD)</title>
+  <link rel="stylesheet" href="css/eterno.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="app-nav">
+      <div class="brand">Eterno <span>Decisión de compra · solo USD</span></div>
+      <div class="nav-links">
+        <a href="index.html">Inicio</a>
+        <a href="quotation_tracker.html">Cotizaciones</a>
+        <a href="supplier_cost_comparison_dashboard.html" class="active">Comparador</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Unit economics &amp; COGS</h1>
+        <p class="page-sub">Compara escenarios de proveedor y define tu mix óptimo para maximizar margen sin perder spec.</p>
+      </div>
+      <div class="toolbar">
+        <button type="button" class="btn" id="btnSync">↻ Actualizar precios</button>
+        <button type="button" class="btn btn-primary" id="btnSave">Guardar estrategia</button>
+      </div>
+    </header>
+
+    <div class="compare-hero" id="heroCards"></div>
+
+    <div class="controls-bar">
+      <div class="control-group">
+        <label>PVP referencia</label>
+        <input type="number" id="retailPrice" min="1" step="0.5" value="28" style="width:80px">
+        <span class="note" style="margin:0">USD / 100 ml</span>
+      </div>
+      <div class="control-group">
+        <label>Densidad producto</label>
+        <input type="number" id="densityIn" min="0.8" max="1" step="0.01" value="0.9" style="width:64px">
+        <span class="note" style="margin:0">g/ml</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="t1">Matriz de costos</button>
+      <button type="button" class="tab" data-tab="t2">Economía por lote</button>
+      <button type="button" class="tab" data-tab="t3">Mix de compra</button>
+      <button type="button" class="tab" data-tab="t4">Margen</button>
+      <button type="button" class="tab" data-tab="t6">Importación</button>
+      <button type="button" class="tab" data-tab="t5">Riesgos</button>
+    </div>
+
+    <!-- Matriz -->
+    <div id="t1" class="panel active">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ingrediente</th>
+              <th class="th-num">% fórmula</th>
+              <th class="th-num" id="thP1"></th>
+              <th class="th-num" id="thP2"></th>
+              <th class="th-num">Contrib. P1</th>
+              <th class="th-num">Contrib. P2</th>
+              <th class="th-num">Δ vs P2</th>
+              <th class="th-num">Híbrido</th>
+              <th style="text-align:center">Decisión</th>
+            </tr>
+          </thead>
+          <tbody id="ingTable"></tbody>
+        </table>
+      </div>
+      <p class="note" id="tableNote"></p>
+    </div>
+
+    <!-- Lotes -->
+    <div id="t2" class="panel">
+      <div class="toolbar" id="sizeButtons" style="margin-bottom:16px"></div>
+      <div class="metrics" id="batchMetrics"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card"><h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">COGS por escenario (USD)</h4><div style="height:220px"><canvas id="batchChart"></canvas></div></div>
+        <div class="card"><h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">Top 5 drivers de costo (híbrido)</h4><div style="height:220px"><canvas id="driversChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- Mix compra -->
+    <div id="t3" class="panel">
+      <div class="decision-grid">
+        <div class="card">
+          <h4 style="font-size:14px;margin-bottom:12px">Lista de compra — escenario híbrido</h4>
+          <ul class="proc-list" id="procList"></ul>
+          <p class="note" style="margin-top:12px" id="procTotal"></p>
+        </div>
+        <div class="card">
+          <h4 style="font-size:14px;margin-bottom:12px">Configurar mix por ingrediente</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Ingrediente</th><th class="th-num">P1</th><th class="th-num">P2</th><th>Proveedor</th><th class="th-num">Ahorro línea</th></tr>
+              </thead>
+              <tbody id="hybridTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Margen -->
+    <div id="t4" class="panel">
+      <div class="card">
+        <h4 style="font-size:14px;margin-bottom:16px">Simulador de margen bruto (materia prima)</h4>
+        <div class="margin-sim">
+          <div class="field">
+            <label>Precio venta (USD / 100 ml)</label>
+            <input type="number" id="retailPrice2" min="1" step="0.5" value="28">
+          </div>
+          <div class="field">
+            <label>Empaque + etiqueta (USD / unidad)</label>
+            <input type="number" id="packCost" min="0" step="0.1" value="2.5">
+          </div>
+          <div class="field">
+            <label>Otros variables (USD / unidad)</label>
+            <input type="number" id="varCost" min="0" step="0.1" value="1">
+          </div>
+        </div>
+        <div class="metrics" id="marginMetrics" style="margin-top:20px"></div>
+      </div>
+    </div>
+
+    <!-- Importación (aparte) -->
+    <div id="t6" class="panel">
+      <div class="card import-panel">
+        <h4 style="font-size:15px;margin-bottom:8px;font-weight:600">Costo puesto en destino (landed)</h4>
+        <p class="note" style="margin-top:0;margin-bottom:0">
+          Las cotizaciones de proveedor son <strong>FOB</strong> (materia prima en origen).
+          Aquí estimas logística, seguro, arancel y gestión aduanera como un % único sobre FOB.
+        </p>
+        <div class="slider-row">
+          <label style="font-size:13px;color:var(--muted);min-width:140px">Recargo importación</label>
+          <input type="range" id="landedPct" min="0" max="60" value="25" step="5">
+          <span class="pct-big" id="landedLbl">25%</span>
+        </div>
+        <div class="metrics" id="importMetrics"></div>
+        <p class="note">Estos valores no alteran la matriz principal; solo aplican en esta sección y en el simulador de margen si eliges usar landed.</p>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h4 style="font-size:14px;margin-bottom:12px;font-weight:600">Comparativa FOB vs Landed (USD/kg)</h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Escenario</th>
+                <th class="th-num">FOB / kg</th>
+                <th class="th-num">Landed / kg</th>
+                <th class="th-num">Extra import</th>
+              </tr>
+            </thead>
+            <tbody id="importTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riesgos -->
+    <div id="t5" class="panel">
+      <div id="alertsBody"></div>
+    </div>
+  </div>
+
+  <script src="js/eterno-store.js"></script>
+  <script>
+    let db = EternoStore.loadDb();
+    let batchMl = 100;
+    let batchChart = null;
+    let driversChart = null;
+
+    const fmt = (n, d = 2) => Number(n).toFixed(d);
+    const usd = (n, d = 2) => '<span class="usd">' + fmt(n, d) + '</span>';
+
+    const ALERTS = [
+      { type: 'err', title: 'Ginseng P1 — alcohol-soluble', text: 'No usar en base anhidra. El ahorro en $ no compensa ineficacia del activo.' },
+      { type: 'warn', title: 'Saw Palmetto P2 — spec distinta', text: 'Precio bajo pero no es CO₂ oil-soluble. Para claim DHT, priorizar P1 aunque cueste más.' },
+      { type: 'warn', title: 'Romero P2 — rosmarínico vs carnósico', text: 'Decisión técnica > precio. CO₂ carnósico (P1) para estabilidad y mecanismo en oleoso.' },
+      { type: 'warn', title: 'Squalane P2 — premium de marketing', text: '7× precio vs P1 sin beneficio funcional documentado en fórmula.' },
+      { type: 'info', title: 'Datos incompletos P2', text: 'Isochrysis y ácido oleico: solo P1 cotizado → híbrido hereda P1.' },
+      { type: 'ok', title: 'Regla de negocio recomendada', text: 'Activos críticos y specs únicas en P1 · Carriers y AE commodity en P2 cuando spec = OK.' },
+    ];
+
+    function getLandedPct() {
+      const el = document.getElementById('landedPct');
+      return el ? +el.value : (db.settings.importMarkupPct ?? 25);
+    }
+    function landedMult() {
+      return 1 + getLandedPct() / 100;
+    }
+
+    function getRows() {
+      const factor = EternoStore.pctFactor(db);
+      const { p1, p2 } = EternoStore.getPricesFromQuotations(db);
+      return db.formula.map(ing => {
+        const pct = (ing.pct / 100) * factor;
+        const price1 = p1[ing.id] ?? null;
+        const price2 = p2[ing.id] ?? null;
+        const flags = EternoStore.ING_FLAGS[ing.id] || { flag: 'ok' };
+        const pick = db.hybrid[ing.id] || 'p1';
+        const specOk = flags.flag === 'ok' || (flags.flag === 'miss-p2' && pick === 'p1');
+        let hPrice = null;
+        if (pick === 'p2' && price2 != null && specOk) hPrice = price2;
+        else if (price1 != null) hPrice = price1;
+        else hPrice = price2;
+        const c1 = price1 != null ? pct * price1 : 0;
+        const c2 = price2 != null ? pct * price2 : (price1 != null ? pct * price1 : 0);
+        const ch = hPrice != null ? pct * hPrice : 0;
+        const saveVsP2 = c2 - ch;
+        return { ing, pct, price1, price2, flags, pick, hPrice, c1, c2, ch, saveVsP2, specOk };
+      });
+    }
+
+    function totals() {
+      const rows = getRows();
+      const fob = {
+        p1: rows.reduce((s, r) => s + r.c1, 0),
+        p2: rows.reduce((s, r) => s + r.c2, 0),
+        hybrid: rows.reduce((s, r) => s + r.ch, 0),
+      };
+      const lm = landedMult();
+      return {
+        ...fob,
+        p1L: fob.p1 * lm,
+        p2L: fob.p2 * lm,
+        hybridL: fob.hybrid * lm,
+        saveVsP2: fob.p2 - fob.hybrid,
+        saveVsP1: fob.p1 - fob.hybrid,
+        savePctP2: fob.p2 > 0 ? ((fob.p2 - fob.hybrid) / fob.p2 * 100) : 0,
+      };
+    }
+
+    function renderHero() {
+      const t = totals();
+      const p1n = db.settings.supplierP1 || 'Proveedor 1';
+      const p2n = db.settings.supplierP2 || 'Proveedor 2';
+      document.getElementById('heroCards').innerHTML = `
+        <div class="hero-main">
+          <div class="hero-label">COGS híbrido · precio proveedor (FOB)</div>
+          <div class="hero-amount">${usd(t.hybrid, 2)}<span> / kg</span></div>
+          <div class="hero-delta">Ahorro ${usd(t.saveVsP2, 2)}/kg vs ${p2n} (−${fmt(t.savePctP2, 0)}%)</div>
+          <a class="compare-link" href="#" onclick="goImportTab();return false">Ver costo con importación →</a>
+        </div>
+        <div class="scenario-card">
+          <span class="sc-label">${p1n}</span>
+          <div class="sc-amount">${usd(t.p1, 2)}</div>
+          <div class="sc-sub">FOB / kg fórmula</div>
+        </div>
+        <div class="scenario-card">
+          <span class="sc-label">${p2n}</span>
+          <div class="sc-amount">${usd(t.p2, 2)}</div>
+          <div class="sc-sub">FOB / kg fórmula</div>
+        </div>
+        <div class="scenario-card winner">
+          <span class="sc-badge">Óptimo</span>
+          <span class="sc-label">Híbrido</span>
+          <div class="sc-amount">${usd(t.hybrid, 2)}</div>
+          <div class="sc-sub">FOB · ahorro vs P2</div>
+        </div>
+      `;
+      document.getElementById('thP1').textContent = p1n + ' $/kg';
+      document.getElementById('thP2').textContent = p2n + ' $/kg';
+    }
+
+    function recommendPick(r) {
+      if (r.flags.flag === 'err-p1' || r.flags.flag === 'spec') {
+        if (r.price1 != null && r.flags.flag !== 'err-p1') return 'p1';
+        return r.pick;
+      }
+      if (r.price1 == null) return 'p2';
+      if (r.price2 == null) return 'p1';
+      return r.c1 <= r.c2 ? 'p1' : 'p2';
+    }
+
+    function renderTable() {
+      const rows = getRows();
+      const t = totals();
+      const maxC = Math.max(...rows.map(r => r.ch), 0.01);
+      document.getElementById('ingTable').innerHTML = rows.map(r => {
+        const rec = recommendPick(r);
+        const deltaClass = r.saveVsP2 > 0.001 ? 'td-save' : (r.saveVsP2 < -0.001 ? 'td-loss' : '');
+        const pickBadge = r.pick === 'p1'
+          ? '<span class="badge pill-p1">P1</span>'
+          : '<span class="badge pill-p2">P2</span>';
+        const recNote = rec !== r.pick ? ' <span class="badge b-warn" title="Sugerencia automática">↻</span>' : '';
+        const barW = Math.round((r.ch / maxC) * 100);
+        return `<tr>
+          <td>
+            <strong>${r.ing.name}</strong>
+            <div class="cost-bar-wrap"><div class="cost-bar" style="width:${barW}%;background:var(--accent)"></div></div>
+          </td>
+          <td class="td-num">${(r.pct * 100).toFixed(2)}%</td>
+          <td class="td-num">${r.price1 != null ? fmt(r.price1) : '—'}</td>
+          <td class="td-num">${r.price2 != null ? fmt(r.price2) : '—'}</td>
+          <td class="td-num">${fmt(r.c1)}</td>
+          <td class="td-num">${fmt(r.c2)}</td>
+          <td class="td-num ${deltaClass}">${r.saveVsP2 > 0 ? '+' : ''}${fmt(r.saveVsP2)}</td>
+          <td class="td-num" style="color:var(--accent);font-weight:600">${fmt(r.ch)}</td>
+          <td style="text-align:center">${pickBadge}${recNote}</td>
+        </tr>`;
+      }).join('') + `
+        <tr style="background:var(--surface2);font-weight:600">
+          <td colspan="4">TOTAL COGS (USD/kg fórmula)</td>
+          <td class="td-num">${fmt(t.p1)}</td>
+          <td class="td-num">${fmt(t.p2)}</td>
+          <td class="td-num td-save">+${fmt(t.saveVsP2)}</td>
+          <td class="td-num" style="color:var(--accent)">${fmt(t.hybrid)}</td>
+          <td></td>
+        </tr>`;
+      document.getElementById('tableNote').textContent =
+        'Contrib. = precio × % normalizado. Δ vs P2 = ahorro del híbrido en esa línea. Última sync: ' +
+        (db.meta.updatedAt || '').replace('T', ' ').slice(0, 16);
+    }
+
+    function renderHybrid() {
+      const rows = getRows();
+      document.getElementById('hybridTable').innerHTML = rows.map(r => {
+        const save = r.saveVsP2;
+        return `<tr>
+          <td>${r.ing.name}</td>
+          <td class="td-num">${r.price1 != null ? fmt(r.price1) : '—'}</td>
+          <td class="td-num">${r.price2 != null ? fmt(r.price2) : '—'}</td>
+          <td>
+            <select data-hybrid="${r.ing.id}" class="inp" style="width:auto">
+              <option value="p1"${r.pick === 'p1' ? ' selected' : ''}>P1</option>
+              <option value="p2"${r.pick === 'p2' ? ' selected' : ''}>P2</option>
+            </select>
+          </td>
+          <td class="td-num ${save > 0 ? 'td-save' : ''}">${save > 0 ? '+' + fmt(save) : '—'}</td>
+        </tr>`;
+      }).join('');
+      document.querySelectorAll('[data-hybrid]').forEach(sel => {
+        sel.onchange = () => {
+          db.hybrid[sel.dataset.hybrid] = sel.value;
+          renderAll();
+        };
+      });
+
+      const t = totals();
+      const kg100 = 100 * db.settings.density / 1000;
+      document.getElementById('procList').innerHTML = rows
+        .filter(r => r.hPrice != null)
+        .sort((a, b) => b.ch - a.ch)
+        .map(r => {
+          const prov = r.pick === 'p1' ? db.settings.supplierP1 : db.settings.supplierP2;
+          const line100 = r.ch * kg100;
+          return `<li>
+            <span><span class="badge ${r.pick === 'p1' ? 'pill-p1' : 'pill-p2'}">${r.pick.toUpperCase()}</span> ${r.ing.name}</span>
+            <span class="td-num">${usd(line100)} / 100ml</span>
+          </li>`;
+        }).join('');
+      document.getElementById('procTotal').innerHTML =
+        `COGS MP por 100 ml (FOB): <strong>${usd(t.hybrid * kg100)}</strong> — ` +
+        `<a href="#" onclick="goImportTab();return false">calcular con importación</a>`;
+    }
+
+    function renderImport() {
+      const t = totals();
+      const pct = getLandedPct();
+      const extra = t.hybridL - t.hybrid;
+      document.getElementById('landedLbl').textContent = pct + '%';
+      document.getElementById('importMetrics').innerHTML = `
+        <div class="metric"><div class="metric-label">Híbrido FOB</div><div class="metric-value">${usd(t.hybrid)}</div><div class="metric-sub">USD / kg</div></div>
+        <div class="metric"><div class="metric-label">Híbrido landed</div><div class="metric-value" style="color:var(--accent)">${usd(t.hybridL)}</div><div class="metric-sub">+${pct}% sobre FOB</div></div>
+        <div class="metric"><div class="metric-label">Costo extra import</div><div class="metric-value">${usd(extra)}</div><div class="metric-sub">por kg de fórmula</div></div>
+        <div class="metric"><div class="metric-label">100 ml landed</div><div class="metric-value">${usd(t.hybridL * 0.1 * db.settings.density)}</div><div class="metric-sub">solo MP</div></div>
+      `;
+      const p1n = db.settings.supplierP1 || 'P1';
+      const p2n = db.settings.supplierP2 || 'P2';
+      document.getElementById('importTable').innerHTML = [
+        { n: p1n, f: t.p1, l: t.p1L },
+        { n: p2n, f: t.p2, l: t.p2L },
+        { n: 'Híbrido', f: t.hybrid, l: t.hybridL },
+      ].map(r => `<tr>
+        <td><strong>${r.n}</strong></td>
+        <td class="td-num">${fmt(r.f)}</td>
+        <td class="td-num">${fmt(r.l)}</td>
+        <td class="td-num">+${fmt(r.l - r.f)}</td>
+      </tr>`).join('');
+    }
+
+    function goImportTab() {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="t6"]').classList.add('active');
+      document.getElementById('t6').classList.add('active');
+      renderImport();
+    }
+
+    function renderMargin() {
+      const t = totals();
+      const retail = +document.getElementById('retailPrice2').value || 28;
+      const pack = +document.getElementById('packCost').value || 0;
+      const vari = +document.getElementById('varCost').value || 0;
+      const kg = 0.1 * db.settings.density;
+      const cogsUnit = t.hybridL * kg;
+      const totalCost = cogsUnit + pack + vari;
+      const margin = retail - totalCost;
+      const marginPct = retail > 0 ? (margin / retail * 100) : 0;
+      const marginP2 = retail - (t.p2L * kg + pack + vari);
+      const extraVsP2 = margin - marginP2;
+      document.getElementById('marginMetrics').innerHTML = `
+        <div class="metric"><div class="metric-label">Costo total / 100 ml</div><div class="metric-value">${usd(totalCost)}</div><div class="metric-sub">MP (landed) + empaque + variable · ver pestaña Importación</div></div>
+        <div class="metric"><div class="metric-label">Margen bruto / unidad</div><div class="metric-value" style="color:${margin >= 0 ? 'var(--accent)' : 'var(--err)'}">${usd(margin)}</div><div class="metric-sub">${fmt(marginPct, 1)}% sobre PVP ${usd(retail)}</div></div>
+        <div class="metric"><div class="metric-label">MP sola</div><div class="metric-value">${usd(cogsUnit)}</div><div class="metric-sub">Híbrido landed · ${(kg * 1000).toFixed(0)} g</div></div>
+        <div class="metric"><div class="metric-label">Margen extra vs solo P2</div><div class="metric-value" style="color:${extraVsP2 >= 0 ? 'var(--accent)' : 'var(--err)'}">${extraVsP2 >= 0 ? '+' : ''}${usd(extraVsP2)}</div><div class="metric-sub">por cada 100 ml vendidos</div></div>
+      `;
+    }
+
+    function renderBatch() {
+      const t = totals();
+      const lm = landedMult();
+      const kg = batchMl * db.settings.density / 1000;
+      const labels = ['P1', 'P2', 'Híbrido'];
+      const costs = [t.p1 * kg, t.p2 * kg, t.hybrid * kg];
+      document.getElementById('batchMetrics').innerHTML = `
+        <div class="metric"><div class="metric-label">Lote ${batchMl} ml</div><div class="metric-value">${kg.toFixed(3)} kg</div><div class="metric-sub">Densidad ${db.settings.density} g/ml</div></div>
+        <div class="metric"><div class="metric-label">Híbrido FOB</div><div class="metric-value">${usd(t.hybrid * kg)}</div><div class="metric-sub">Ahorro ${usd((t.p2 - t.hybrid) * kg)} vs P2</div></div>
+        <div class="metric"><div class="metric-label">Solo P2 (FOB)</div><div class="metric-value">${usd(t.p2 * kg)}</div><div class="metric-sub">mismo volumen</div></div>
+        <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">${usd(t.hybridL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">+${getLandedPct()}% · ajustar</a></div></div>
+      `;
+
+      if (batchChart) batchChart.destroy();
+      batchChart = new Chart(document.getElementById('batchChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: costs,
+            backgroundColor: ['#6b9fd4', '#e8b86d', '#5cb87a'],
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (c) => ' $' + c.parsed.y.toFixed(2) + ' USD' } },
+          },
+          scales: {
+            y: { ticks: { callback: (v) => '$' + v } },
+          },
+        },
+      });
+
+      const top = getRows().sort((a, b) => b.ch - a.ch).slice(0, 5);
+      if (driversChart) driversChart.destroy();
+      driversChart = new Chart(document.getElementById('driversChart'), {
+        type: 'bar',
+        data: {
+          labels: top.map(r => r.ing.name.split(' ')[0]),
+          datasets: [{ data: top.map(r => r.ch * kg), backgroundColor: '#5cb87a', borderRadius: 4 }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { callback: (v) => '$' + v } } },
+        },
+      });
+    }
+
+    function renderAlerts() {
+      document.getElementById('alertsBody').innerHTML = ALERTS.map(a => `
+        <div class="alert alert-${a.type === 'err' ? 'err' : a.type}">
+          <div>
+            <div class="alert-title">${a.title}</div>
+            <div>${a.text}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAll() {
+      renderHero();
+      renderTable();
+      renderHybrid();
+      renderMargin();
+      renderAlerts();
+      const active = document.querySelector('.panel.active');
+      if (active?.id === 't2') renderBatch();
+      if (active?.id === 't6') renderImport();
+    }
+
+    function bindControls() {
+      const syncRetail = (v) => {
+        document.getElementById('retailPrice').value = v;
+        document.getElementById('retailPrice2').value = v;
+        renderMargin();
+      };
+      document.getElementById('retailPrice').oninput = (e) => syncRetail(e.target.value);
+      document.getElementById('retailPrice2').oninput = (e) => syncRetail(e.target.value);
+      const landedEl = document.getElementById('landedPct');
+      if (landedEl) {
+        landedEl.oninput = (e) => {
+          document.getElementById('landedLbl').textContent = e.target.value + '%';
+          db.settings.importMarkupPct = +e.target.value;
+          renderAll();
+        };
+      }
+      document.getElementById('densityIn').oninput = (e) => {
+        db.settings.density = +e.target.value || 0.9;
+        document.getElementById('densityLbl')?.remove();
+        renderAll();
+      };
+      document.getElementById('packCost').oninput = renderMargin;
+      document.getElementById('varCost').oninput = renderMargin;
+    }
+
+    [100, 500, 1000, 5000].forEach(ml => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (ml === 100 ? ' btn-primary' : '');
+      b.textContent = ml + ' ml';
+      b.onclick = () => {
+        batchMl = ml;
+        document.querySelectorAll('#sizeButtons .btn').forEach(x => x.classList.remove('btn-primary'));
+        b.classList.add('btn-primary');
+        renderBatch();
+      };
+      document.getElementById('sizeButtons').appendChild(b);
+    });
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+        if (tab.dataset.tab === 't2') renderBatch();
+        if (tab.dataset.tab === 't4') renderMargin();
+        if (tab.dataset.tab === 't6') renderImport();
+      };
+    });
+
+    document.getElementById('btnSave').onclick = () => {
+      db.settings.importMarkupPct = +document.getElementById('landedPct').value;
+      db.settings.density = +document.getElementById('densityIn').value;
+      EternoStore.saveDb(db);
+      EternoStore.toast('Estrategia guardada');
+    };
+    document.getElementById('btnSync').onclick = () => {
+      db = EternoStore.loadDb();
+      renderAll();
+      EternoStore.toast('Precios sincronizados');
+    };
+
+    const landedInit = document.getElementById('landedPct');
+    if (landedInit) {
+      landedInit.value = db.settings.importMarkupPct ?? 25;
+      document.getElementById('landedLbl').textContent = landedInit.value + '%';
+    }
+    document.getElementById('densityIn').value = db.settings.density ?? 0.9;
+
+    bindControls();
+    renderAll();
+  </script>
+</body>
+</html>

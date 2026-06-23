@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eterno — Tracker de cotizaciones</title>
+  <link rel="stylesheet" href="css/eterno.css">
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="app-nav">
+      <div class="brand">Eterno <span>Tracker de cotizaciones</span></div>
+      <div class="nav-links">
+        <a href="index.html">Inicio</a>
+        <a href="quotation_tracker.html" class="active">Cotizaciones</a>
+        <a href="supplier_cost_comparison_dashboard.html">Comparador</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Cotizaciones por ingrediente</h1>
+        <p class="page-sub" id="saveStatus">Guardado automático en este navegador</p>
+      </div>
+      <div class="toolbar">
+        <select id="sortSel">
+          <option value="budget">Presupuesto mínimo ↓</option>
+          <option value="pct">% fórmula ↓</option>
+          <option value="cat">Categoría</option>
+          <option value="name">Nombre A→Z</option>
+          <option value="status">Estado</option>
+        </select>
+        <button type="button" class="btn btn-primary" id="btnAdd">+ Cotización</button>
+        <button type="button" class="btn" id="btnExportCsv">CSV</button>
+        <button type="button" class="btn" id="btnExportJson">JSON</button>
+        <button type="button" class="btn" id="btnImportJson">Importar</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+      </div>
+    </header>
+
+    <div class="metrics" id="metrics"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ingrediente</th>
+            <th style="text-align:center">%</th>
+            <th style="text-align:center">Cat.</th>
+            <th>Proveedor</th>
+            <th style="text-align:right">USD/kg</th>
+            <th style="text-align:right">MOQ</th>
+            <th style="text-align:right">Min. USD</th>
+            <th style="text-align:right">$/kg fórmula</th>
+            <th style="text-align:center">Spec</th>
+            <th style="text-align:center">Anhidra</th>
+            <th style="text-align:center">Estado</th>
+            <th style="text-align:center">Acc.</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="note" id="totalNote"></p>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3 id="modalTitle">Agregar cotización</h3>
+      <div class="field">
+        <label>Ingrediente</label>
+        <select id="fIng"></select>
+      </div>
+      <div class="field">
+        <label>Proveedor</label>
+        <input type="text" id="fProv" placeholder="P1 China, P2 Imagen...">
+      </div>
+      <div class="field">
+        <label>Precio USD/kg</label>
+        <input type="number" id="fPrice" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label>MOQ (kg)</label>
+        <input type="number" id="fMoq" min="0" step="0.1" value="1">
+      </div>
+      <div class="field">
+        <label>Spec</label>
+        <select id="fSpec">
+          <option value="pending">Pendiente</option>
+          <option value="ok">Confirmada</option>
+          <option value="warn">Revisar</option>
+          <option value="fail">No cumple</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Estado</label>
+        <select id="fStatus">
+          <option value="cotizado">Cotizado</option>
+          <option value="negociando">Negociando</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="descartado">Descartado</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Compatibilidad base anhidra</label>
+        <select id="fCompat">
+          <option value="pending">Pendiente</option>
+          <option value="yes">Sí compatible</option>
+          <option value="no">No compatible</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Notas</label>
+        <input type="text" id="fNotes" placeholder="COA, spec, link...">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btnCancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="listModal">
+    <div class="modal" style="max-width:520px" onclick="event.stopPropagation()">
+      <h3 id="listTitle">Cotizaciones</h3>
+      <div id="listBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btnListClose">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/eterno-store.js"></script>
+  <script>
+    const CAT = { carrier: ['b-carrier', 'Carrier'], active: ['b-active', 'Activo'], eo: ['b-eo', 'AE'], ao: ['b-ao', 'Antioxid.'] };
+    const ST = { cotizado: ['b-pend', 'Cotizado'], negociando: ['b-warn', 'Negociando'], aprobado: ['b-ok', 'Aprobado'], descartado: ['b-err', 'Descartado'] };
+    const SP = { ok: ['b-ok', 'OK'], warn: ['b-warn', 'Revisar'], fail: ['b-err', 'No cumple'], pending: ['b-pend', 'Pendiente'] };
+    const CP = { yes: ['b-ok', 'Compatible'], no: ['b-err', 'Incompatible'], pending: ['b-pend', 'Pendiente'] };
+
+    let db = EternoStore.loadDb();
+    let editId = null;
+
+    function badge(map, key) {
+      const [c, l] = map[key] || map.pending;
+      return `<span class="badge ${c}">${l}</span>`;
+    }
+
+    function pctDisplay(p) {
+      return (Math.round(p * 100) / 100).toFixed(2).replace(/\.00$/, '') + '%';
+    }
+
+    function persist() {
+      EternoStore.saveDb(db);
+      document.getElementById('saveStatus').textContent =
+        'Guardado · ' + new Date().toLocaleTimeString('es-CO');
+      EternoStore.toast('Guardado');
+    }
+
+    function getBest(ingId) {
+      const approved = db.quotations.filter(q => q.ingId === ingId && q.status === 'aprobado' && q.compat !== 'no');
+      if (approved.length) return approved.sort((a, b) => a.price - b.price)[0];
+      const any = db.quotations.filter(q => q.ingId === ingId && q.compat !== 'no');
+      if (any.length) return any.sort((a, b) => a.price - b.price)[0];
+      const all = db.quotations.filter(q => q.ingId === ingId);
+      return all.length ? all.sort((a, b) => a.price - b.price)[0] : null;
+    }
+
+    function renderMetrics() {
+      const factor = EternoStore.pctFactor(db);
+      const total = EternoStore.sumPct(db);
+      const approved = db.quotations.filter(q => q.status === 'aprobado');
+      const approvedCompat = approved.filter(q => q.compat !== 'no');
+      const budget = approved.reduce((s, q) => s + q.price * q.moq, 0);
+      const budgetC = approvedCompat.reduce((s, q) => s + q.price * q.moq, 0);
+      const covered = new Set(approved.map(q => q.ingId)).size;
+      const coveredC = new Set(approvedCompat.map(q => q.ingId)).size;
+      const incompat = db.quotations.filter(q => q.compat === 'no').length;
+      const pctMsg = Math.abs(total - 100) < 0.01
+        ? `${pctDisplay(total)} ✓`
+        : `${pctDisplay(total)} (×${factor.toFixed(4)})`;
+
+      document.getElementById('metrics').innerHTML = `
+        <div class="metric"><div class="metric-label">Registros</div><div class="metric-value">${db.quotations.length}</div><div class="metric-sub">${covered} ingr. con aprobado</div></div>
+        <div class="metric"><div class="metric-label">Aprobadas</div><div class="metric-value">${approved.length}</div><div class="metric-sub">${coveredC}/${db.formula.length} compatibles</div></div>
+        <div class="metric"><div class="metric-label">Min. compra</div><div class="metric-value">$${budget.toFixed(0)}</div><div class="metric-sub">Compat: $${budgetC.toFixed(0)}</div></div>
+        <div class="metric"><div class="metric-label">Alertas</div><div class="metric-value">${incompat}</div><div class="metric-sub">incompatibles · ${pctMsg}</div></div>
+      `;
+    }
+
+    function renderTable() {
+      const sort = document.getElementById('sortSel').value;
+      const factor = EternoStore.pctFactor(db);
+      let rows = db.formula.map(ing => {
+        const best = getBest(ing.id);
+        const allQ = db.quotations.filter(q => q.ingId === ing.id);
+        const raw = allQ.length ? allQ.sort((a, b) => a.price - b.price)[0] : null;
+        const effPct = (Number(ing.pct) || 0) * factor;
+        const costPerKg = best ? best.price * effPct / 100 : null;
+        return { ...ing, best, raw, allQ, effPct, costPerKg, budget: best ? best.price * best.moq : Infinity };
+      });
+
+      rows.sort((a, b) => {
+        if (sort === 'budget') return (a.budget === Infinity && b.budget === Infinity) ? 0 : a.budget - b.budget;
+        if (sort === 'pct') return b.pct - a.pct;
+        if (sort === 'cat') return a.cat.localeCompare(b.cat);
+        if (sort === 'name') return a.name.localeCompare(b.name);
+        if (sort === 'status') {
+          const o = { aprobado: 0, negociando: 1, cotizado: 2, descartado: 4 };
+          return (o[a.best?.status] ?? 3) - (o[b.best?.status] ?? 3);
+        }
+        return 0;
+      });
+
+      const pctMax = Math.max(...rows.map(r => r.effPct), 1);
+      const colors = { carrier: '#378ADD', active: '#534AB7', eo: '#EF9F27', ao: '#1D9E75' };
+
+      document.getElementById('tbody').innerHTML = rows.map(ing => {
+        const b = ing.best;
+        const prov = b
+          ? `<strong>${esc(b.provider)}</strong>${ing.allQ.length > 1 ? ` <span class="ghost">+${ing.allQ.length - 1}</span>` : ''}`
+          : (ing.raw ? `<strong>${esc(ing.raw.provider)}</strong> <span class="badge b-err">Incompatible</span>` : '<span class="ghost">Sin cot.</span>');
+        return `<tr>
+          <td>
+            <div style="font-weight:500">${esc(ing.name)}</div>
+            <div class="ghost">${esc(ing.inci)}</div>
+            <div class="prio-bar" style="width:${Math.round(ing.effPct / pctMax * 100)}%;background:${colors[ing.cat]}"></div>
+          </td>
+          <td style="text-align:center">${pctDisplay(ing.effPct)}</td>
+          <td style="text-align:center">${badge({ carrier: CAT.carrier, active: CAT.active, eo: CAT.eo, ao: CAT.ao }, ing.cat)}</td>
+          <td>${prov}</td>
+          <td style="text-align:right">${b ? '$' + b.price.toFixed(2) : '—'}</td>
+          <td style="text-align:right">${b ? b.moq + ' kg' : '—'}</td>
+          <td style="text-align:right">${b ? '<strong>$' + (b.price * b.moq).toFixed(0) + '</strong>' : '—'}</td>
+          <td style="text-align:right">${ing.costPerKg != null ? '$' + ing.costPerKg.toFixed(3) : '—'}</td>
+          <td style="text-align:center">${b ? badge(SP, b.spec) : badge(SP, 'pending')}</td>
+          <td style="text-align:center">${b ? badge(CP, b.compat) : (ing.raw ? badge(CP, ing.raw.compat) : badge(CP, 'pending'))}</td>
+          <td style="text-align:center">${b ? badge(ST, b.status) : badge(ST, 'pending')}</td>
+          <td style="text-align:center">
+            <button type="button" class="btn btn-sm" data-add="${ing.id}">+</button>
+            ${ing.allQ.length ? `<button type="button" class="btn btn-sm" data-list="${ing.id}">≡</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('');
+
+      const totalCost = rows.reduce((s, r) => s + (r.costPerKg || 0), 0);
+      document.getElementById('totalNote').textContent = totalCost > 0
+        ? `Costo estimado (compatibles, normalizado): $${totalCost.toFixed(3)} USD/kg de fórmula`
+        : 'Agrega cotizaciones para calcular costo/kg.';
+
+      document.querySelectorAll('[data-add]').forEach(el => el.onclick = () => openModal(el.dataset.add));
+      document.querySelectorAll('[data-list]').forEach(el => el.onclick = () => openList(el.dataset.list));
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    function renderAll() {
+      renderMetrics();
+      renderTable();
+    }
+
+    function openModal(ingId, entry) {
+      editId = entry?.id || null;
+      document.getElementById('modalTitle').textContent = editId ? 'Editar cotización' : 'Agregar cotización';
+      document.getElementById('fIng').innerHTML = db.formula.map(i =>
+        `<option value="${i.id}"${i.id === (entry?.ingId || ingId) ? ' selected' : ''}>${esc(i.name)}</option>`
+      ).join('');
+      document.getElementById('fProv').value = entry?.provider || '';
+      document.getElementById('fPrice').value = entry?.price ?? '';
+      document.getElementById('fMoq').value = entry?.moq ?? 1;
+      document.getElementById('fSpec').value = entry?.spec || 'pending';
+      document.getElementById('fStatus').value = entry?.status || 'cotizado';
+      document.getElementById('fCompat').value = entry?.compat || 'pending';
+      document.getElementById('fNotes').value = entry?.notes || '';
+      document.getElementById('modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+      editId = null;
+    }
+
+    function openList(ingId) {
+      const ing = db.formula.find(i => i.id === ingId);
+      const list = db.quotations.filter(q => q.ingId === ingId);
+      document.getElementById('listTitle').textContent = ing?.name || ingId;
+      document.getElementById('listBody').innerHTML = list.length ? list.map(q => `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px">
+          <strong>${esc(q.provider)}</strong> — $${q.price}/kg · MOQ ${q.moq}kg<br>
+          ${badge(ST, q.status)} ${badge(SP, q.spec)} ${badge(CP, q.compat)}
+          ${q.notes ? '<br><span class="ghost">' + esc(q.notes) + '</span>' : ''}
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button type="button" class="btn btn-sm" data-edit="${q.id}">Editar</button>
+            <button type="button" class="btn btn-sm btn-danger" data-del="${q.id}">Eliminar</button>
+          </div>
+        </div>
+      `).join('') : '<p class="ghost">Sin cotizaciones</p>';
+
+      document.querySelectorAll('[data-edit]').forEach(el => {
+        el.onclick = () => {
+          const q = db.quotations.find(x => x.id === el.dataset.edit);
+          document.getElementById('listModal').classList.remove('open');
+          openModal(q.ingId, q);
+        };
+      });
+      document.querySelectorAll('[data-del]').forEach(el => {
+        el.onclick = () => {
+          if (!confirm('¿Eliminar esta cotización?')) return;
+          db.quotations = db.quotations.filter(x => x.id !== el.dataset.del);
+          persist();
+          openList(ingId);
+          renderAll();
+        };
+      });
+      document.getElementById('listModal').classList.add('open');
+    }
+
+    document.getElementById('btnAdd').onclick = () => openModal(db.formula[0]?.id);
+    document.getElementById('btnCancel').onclick = closeModal;
+    document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
+    document.getElementById('listModal').onclick = (e) => { if (e.target.id === 'listModal') document.getElementById('listModal').classList.remove('open'); };
+    document.getElementById('btnListClose').onclick = () => document.getElementById('listModal').classList.remove('open');
+
+    document.getElementById('btnSave').onclick = () => {
+      const ingId = document.getElementById('fIng').value;
+      const provider = document.getElementById('fProv').value.trim();
+      const price = parseFloat(document.getElementById('fPrice').value);
+      const moq = parseFloat(document.getElementById('fMoq').value) || 1;
+      if (!provider || !(price > 0)) { alert('Proveedor y precio obligatorios'); return; }
+      const entry = {
+        id: editId || 'q-' + Date.now(),
+        ingId,
+        provider,
+        price,
+        moq,
+        spec: document.getElementById('fSpec').value,
+        status: document.getElementById('fStatus').value,
+        compat: document.getElementById('fCompat').value,
+        notes: document.getElementById('fNotes').value.trim(),
+        date: new Date().toLocaleDateString('es-CO'),
+      };
+      const idx = db.quotations.findIndex(q => q.id === editId);
+      if (idx >= 0) db.quotations[idx] = entry;
+      else db.quotations.push(entry);
+      persist();
+      closeModal();
+      renderAll();
+    };
+
+    document.getElementById('sortSel').onchange = renderTable;
+
+    document.getElementById('btnExportJson').onclick = () => EternoStore.exportJson(db);
+    document.getElementById('btnImportJson').onclick = () => document.getElementById('fileImport').click();
+    document.getElementById('fileImport').onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        db = await EternoStore.importJsonFile(f, true);
+        renderAll();
+        EternoStore.toast('Datos importados');
+      } catch (err) { alert(err.message); }
+      e.target.value = '';
+    };
+
+    document.getElementById('btnExportCsv').onclick = () => {
+      const factor = EternoStore.pctFactor(db);
+      const headers = ['Ingrediente', 'INCI', '%', 'Proveedor', 'USD/kg', 'MOQ', 'Spec', 'Compat', 'Estado'];
+      const lines = [headers.join(',')];
+      db.formula.forEach(ing => {
+        const b = getBest(ing.id);
+        const pct = (ing.pct * factor).toFixed(2);
+        lines.push([
+          ing.name, ing.inci, pct,
+          b?.provider || '', b?.price || '', b?.moq || '',
+          b?.spec || '', b?.compat || '', b?.status || '',
+        ].map(c => `"${String(c).replace(/"/g, '""')}"`).join(','));
+      });
+      const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'eterno_cotizaciones.csv';
+      a.click();
+    };
+
+    renderAll();
+  </script>
+</body>
+</html>

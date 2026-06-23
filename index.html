@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eterno — Panel de formulación y costos</title>
+  <link rel="stylesheet" href="css/eterno.css">
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="app-nav">
+      <div class="brand">
+        Eterno
+        <span>Aceite capilar · cotizaciones y costos</span>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="active">Inicio</a>
+        <a href="quotation_tracker.html">Cotizaciones</a>
+        <a href="supplier_cost_comparison_dashboard.html">Comparador</a>
+        <a href="formula_final.html">Fórmula</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Panel Eterno</h1>
+        <p class="page-sub">Datos guardados en tu navegador (localStorage). Exporta/importa JSON como respaldo.</p>
+      </div>
+    </header>
+
+    <div class="metrics" id="homeMetrics"></div>
+
+    <div class="db-panel">
+      <h4>Base de datos local</h4>
+      <div class="db-actions">
+        <button type="button" class="btn btn-primary" id="btnExportDb">Exportar JSON (backup)</button>
+        <button type="button" class="btn" id="btnImportDb">Importar JSON</button>
+        <button type="button" class="btn" id="btnImportMerge">Importar y fusionar</button>
+        <button type="button" class="btn btn-danger" id="btnResetDb">Restaurar datos iniciales</button>
+      </div>
+      <p class="db-meta" id="dbMeta"></p>
+      <input type="file" id="fileImport" accept=".json,application/json">
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:12px;font-size:15px">Accesos rápidos</h3>
+      <div class="toolbar">
+        <a class="btn btn-primary" href="quotation_tracker.html">Gestionar cotizaciones</a>
+        <a class="btn" href="supplier_cost_comparison_dashboard.html">Ver comparación P1 / P2 / híbrido</a>
+        <a class="btn" href="evaluacion_cientifica_formula_v4_1.md">Evaluación científica (MD)</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/eterno-store.js"></script>
+  <script>
+    const db = EternoStore.loadDb();
+    const total = EternoStore.sumPct(db);
+    const factor = EternoStore.pctFactor(db);
+    const approved = db.quotations.filter(q => q.status === 'aprobado').length;
+    const { p1, p2 } = EternoStore.getPricesFromQuotations(db);
+    const covered = db.formula.filter(ing => p1[ing.id] || p2[ing.id]).length;
+
+    document.getElementById('homeMetrics').innerHTML = `
+      <div class="metric"><div class="metric-label">Cotizaciones</div><div class="metric-value">${db.quotations.length}</div><div class="metric-sub">${approved} aprobadas</div></div>
+      <div class="metric"><div class="metric-label">Ingredientes con precio</div><div class="metric-value">${covered}/${db.formula.length}</div><div class="metric-sub">P1 o P2 compatible</div></div>
+      <div class="metric"><div class="metric-label">Fórmula total</div><div class="metric-value">${total.toFixed(1)}%</div><div class="metric-sub">${Math.abs(total - 100) < 0.01 ? 'OK' : 'Normalizado ×' + factor.toFixed(3)}</div></div>
+      <div class="metric"><div class="metric-label">COGS ref. (híbrido)</div><div class="metric-value" id="homeCogs">—</div><div class="metric-sub">USD/kg fórmula</div></div>
+    `;
+
+    const factor = EternoStore.pctFactor(db);
+    const { p1, p2 } = EternoStore.getPricesFromQuotations(db);
+    let cogs = 0;
+    db.formula.forEach(ing => {
+      const pct = (ing.pct / 100) * factor;
+      const pick = db.hybrid[ing.id] || 'p1';
+      const pr = pick === 'p2' && p2[ing.id] != null ? p2[ing.id] : (p1[ing.id] ?? p2[ing.id]);
+      if (pr != null) cogs += pct * pr;
+    });
+    document.getElementById('homeCogs').textContent = '$' + cogs.toFixed(2);
+
+    document.getElementById('dbMeta').textContent =
+      `Última actualización: ${db.meta.updatedAt || '—'} · Clave: ${EternoStore.DB_KEY}`;
+
+    document.getElementById('btnExportDb').onclick = () => {
+      EternoStore.exportJson(EternoStore.loadDb());
+      EternoStore.toast('Base de datos exportada');
+    };
+
+    document.getElementById('btnImportDb').onclick = () => {
+      document.getElementById('fileImport').dataset.merge = '0';
+      document.getElementById('fileImport').click();
+    };
+    document.getElementById('btnImportMerge').onclick = () => {
+      document.getElementById('fileImport').dataset.merge = '1';
+      document.getElementById('fileImport').click();
+    };
+
+    document.getElementById('fileImport').onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        await EternoStore.importJsonFile(f, e.target.dataset.merge === '1');
+        EternoStore.toast('Importación correcta');
+        location.reload();
+      } catch (err) {
+        alert('Error al importar: ' + err.message);
+      }
+      e.target.value = '';
+    };
+
+    document.getElementById('btnResetDb').onclick = () => {
+      if (!confirm('¿Restaurar cotizaciones y ajustes por defecto? Se perderán cambios no exportados.')) return;
+      EternoStore.saveDb(EternoStore.defaultDb());
+      EternoStore.toast('Datos restaurados');
+      location.reload();
+    };
+  </script>
+</body>
+</html>
