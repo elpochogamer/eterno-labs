@@ -75,7 +75,8 @@
       </div>
       <div class="field">
         <label>Proveedor</label>
-        <input type="text" id="fProv" placeholder="P1 China, P2 Imagen...">
+        <input type="text" id="fProv" list="provList" placeholder="Ej: P1 China, sumiquim...">
+        <datalist id="provList"></datalist>
       </div>
       <div class="field">
         <label>Precio USD/kg</label>
@@ -138,6 +139,11 @@
     const ST = { cotizado: ['b-pend', 'Cotizado'], negociando: ['b-warn', 'Negociando'], aprobado: ['b-ok', 'Aprobado'], descartado: ['b-err', 'Descartado'] };
     const SP = { ok: ['b-ok', 'OK'], warn: ['b-warn', 'Revisar'], fail: ['b-err', 'No cumple'], pending: ['b-pend', 'Pendiente'] };
     const CP = { yes: ['b-ok', 'Compatible'], no: ['b-err', 'Incompatible'], pending: ['b-pend', 'Pendiente'] };
+    const BUCKET = { p1: ['b-carrier', 'P1'], p2: ['b-active', 'P2'], local: ['b-ao', 'Local'] };
+    function bucketBadge(q) {
+      const [cls, lbl] = BUCKET[EternoStore.detectBucket(q)] || ['b-pend', '?'];
+      return `<span class="badge ${cls}">${lbl}</span>`;
+    }
 
     let db = EternoStore.loadDb();
     let editId = null;
@@ -219,8 +225,8 @@
       document.getElementById('tbody').innerHTML = rows.map(ing => {
         const b = ing.best;
         const prov = b
-          ? `<strong>${esc(b.provider)}</strong>${ing.allQ.length > 1 ? ` <span class="ghost">+${ing.allQ.length - 1}</span>` : ''}`
-          : (ing.raw ? `<strong>${esc(ing.raw.provider)}</strong> <span class="badge b-err">Incompatible</span>` : '<span class="ghost">Sin cot.</span>');
+          ? `${bucketBadge(b)} <strong>${esc(b.provider)}</strong>${ing.allQ.length > 1 ? ` <span class="ghost">+${ing.allQ.length - 1}</span>` : ''}`
+          : (ing.raw ? `${bucketBadge(ing.raw)} <strong>${esc(ing.raw.provider)}</strong> <span class="badge b-err">Incompatible</span>` : '<span class="ghost">Sin cot.</span>');
         return `<tr>
           <td>
             <div style="font-weight:500">${esc(ing.name)}</div>
@@ -264,6 +270,7 @@
 
     function openModal(ingId, entry) {
       editId = entry?.id || null;
+      refreshProvList();
       document.getElementById('modalTitle').textContent = editId ? 'Editar cotización' : 'Agregar cotización';
       document.getElementById('fIng').innerHTML = db.formula.map(i =>
         `<option value="${i.id}"${i.id === (entry?.ingId || ingId) ? ' selected' : ''}>${esc(i.name)}</option>`
@@ -321,6 +328,10 @@
     document.getElementById('btnAdd').onclick = () => openModal(db.formula[0]?.id);
     document.getElementById('btnCancel').onclick = closeModal;
     document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
+    function refreshProvList() {
+      const names = [...new Set(db.quotations.map(q => q.provider))].sort();
+      document.getElementById('provList').innerHTML = names.map(n => `<option value="${n}">`).join('');
+    }
     document.getElementById('listModal').onclick = (e) => { if (e.target.id === 'listModal') document.getElementById('listModal').classList.remove('open'); };
     document.getElementById('btnListClose').onclick = () => document.getElementById('listModal').classList.remove('open');
 

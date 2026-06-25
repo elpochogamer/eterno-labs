@@ -161,6 +161,20 @@
     }
     db.purchaseOrders = Array.isArray(db.purchaseOrders) ? db.purchaseOrders : [];
     db.poDraft = db.poDraft || { batchKg: 10, lines: {} };
+
+    // Migrate db.hybrid → db.picks if picks is absent or empty
+    if (!db.picks || Object.keys(db.picks).length === 0) {
+      db.picks = {};
+      if (db.hybrid && typeof db.hybrid === 'object') {
+        const p1Name = db.settings.supplierP1 || 'P1 China';
+        const p2Name = db.settings.supplierP2 || 'P2 Imagen';
+        Object.keys(db.hybrid).forEach((ingId) => {
+          const bucket = db.hybrid[ingId];
+          if (bucket === 'p1') db.picks[ingId] = p1Name;
+          else if (bucket === 'p2') db.picks[ingId] = p2Name;
+        });
+      }
+    }
     return db;
   }
 
@@ -201,29 +215,35 @@
     return t > 0 ? 100 / t : 1;
   }
 
-  function providerBucket(provider) {
-    const p = (provider || '').toLowerCase();
+  function detectBucket(providerOrQuote) {
+    if (providerOrQuote && typeof providerOrQuote === 'object') {
+      if (providerOrQuote.bucket) return providerOrQuote.bucket;
+      return detectBucket(providerOrQuote.provider);
+    }
+    const p = (providerOrQuote || '').toLowerCase();
     if (p.includes('p2') || p.includes('imagen')) return 'p2';
     if (p.includes('p1') || p.includes('china')) return 'p1';
-    return null;
+    return 'local';
   }
+  function providerBucket(provider) { return detectBucket(provider); }
 
   function getPricesFromQuotations(db) {
-    const p1 = {};
-    const p2 = {};
-    db.formula.forEach((ing) => {
-      const qs = db.quotations.filter((q) => q.ingId === ing.id && q.compat !== 'no');
-      const byP1 = qs.filter((q) => providerBucket(q.provider) === 'p1').sort((a, b) => a.price - b.price);
-      const byP2 = qs.filter((q) => providerBucket(q.provider) === 'p2').sort((a, b) => a.price - b.price);
-      if (byP1[0]) p1[ing.id] = byP1[0].price;
-      if (byP2[0]) p2[ing.id] = byP2[0].price;
-    });
-    const manual = db.manualPrices || {};
-    Object.keys(manual).forEach((id) => {
-      if (manual[id]?.p1 != null) p1[id] = manual[id].p1;
-      if (manual[id]?.p2 != null) p2[id] = manual[id].p2;
-    });
-    return { p1, p2 };
+    const result = {};
+    db.quotations
+      .filter((q) => q.compat !== 'no')
+      .forEach((q) => {
+        if (!result[q.provider]) result[q.provider] = {};
+        if (result[q.provider][q.ingId] == null || q.price < result[q.provider][q.ingId]) {
+          result[q.provider][q.ingId] = q.price;
+        }
+      });
+    return result;
+  }
+
+  function savePick(db, ingId, providerName) {
+    if (!db.picks) db.picks = {};
+    db.picks[ingId] = providerName;
+    saveDb(db);
   }
 
   function exportJson(db, filename) {
@@ -290,6 +310,8 @@
     pctFactor,
     getIngredient,
     getPricesFromQuotations,
+    savePick,
+    detectBucket,
     providerBucket,
     exportJson,
     importJsonFile,

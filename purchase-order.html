@@ -169,6 +169,11 @@
       const draft = db.poDraft.lines[ing.id] || {};
       const quotes = quotesFor(ing.id, onlyCompat);
       let qid = draft.qid;
+      // Si no hay draft, pre-seleccionar desde db.picks
+      if (!qid && db.picks?.[ing.id]) {
+        const pickQ = quotes.find(q => q.provider === db.picks[ing.id]);
+        if (pickQ) qid = pickQ.id;
+      }
       // si la cotización guardada ya no existe/visible, cae a la más barata
       if (!quotes.find(q => q.id === qid)) qid = quotes[0] ? quotes[0].id : null;
       const quote = quotes.find(q => q.id === qid) || null;
@@ -267,7 +272,9 @@
       const d = db.poDraft.lines[ingId] || {};
       if (e.target.classList.contains('sel-prov')) {
         d.qid = e.target.value;
-        d.qty = null; // recalcula cantidad por defecto al cambiar proveedor
+        d.qty = null;
+        const q = db.quotations.find(x => x.id === d.qid);
+        if (q) EternoStore.savePick(db, ingId, q.provider);
       }
       if (e.target.classList.contains('qty')) {
         d.qty = Math.max(0, Number(e.target.value) || 0);
