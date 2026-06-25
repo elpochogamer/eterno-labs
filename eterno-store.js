@@ -159,6 +159,8 @@
         ingId: q.ingId || nameToId(q.ingName) || q.ingName,
       }));
     }
+    db.purchaseOrders = Array.isArray(db.purchaseOrders) ? db.purchaseOrders : [];
+    db.poDraft = db.poDraft || { batchKg: 10, lines: {} };
     return db;
   }
 
