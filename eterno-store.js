@@ -41,6 +41,68 @@
     { ingId: 'ginseng', provider: 'P2 Imagen', price: 85.7, moq: 1, spec: 'pending', status: 'negociando', compat: 'pending', notes: 'Ginsenosides 10%; validar solubilidad.' },
     { ingId: 'toco', provider: 'P2 Imagen', price: 28.6, moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: '' },
     { ingId: 'mentha', provider: 'P2 Imagen', price: 17.9, moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: '' },
+
+    // Globalteccinsumos
+    { ingId: null, provider: 'Globalteccinsumos', price: 7200, currency: 'COP', moq: 3.8, spec: 'fail', status: 'cotizado', compat: 'no', notes: 'Aceite de Coco 76. Sin IVA. Mínimo 3.8 L. No está en la fórmula actual.' },
+    { ingId: null, provider: 'Globalteccinsumos', price: 16800, currency: 'COP', moq: 2, spec: 'fail', status: 'cotizado', compat: 'no', notes: 'Elastina Marina (activo puro). Sin IVA. No está en la fórmula actual.' },
+
+    // Be Organic (+57 305 8134616) — precios con IVA incluido, por litro
+    { ingId: 'grapeseed', provider: 'Be Organic', price: 158000, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Uva. Con IVA incluido. Presentación 1L. También disponible 500ml a $85.000.' },
+    { ingId: 'rice', provider: 'Be Organic', price: 176600, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Arroz. Con IVA incluido. Presentación 1L. También disponible 500ml a $90.000.' },
+    { ingId: 'iso', provider: 'Be Organic', price: 158000, currency: 'COP', moq: 1, spec: 'fail', status: 'cotizado', compat: 'no', notes: 'Extracto de Algas (hidrosoluble). Con IVA incluido. HIDROSOLUBLE — NO compatible con fórmula anhydrous.' },
+    { ingId: 'mentha', provider: 'Be Organic', price: 14400, currency: 'COP', moq: 15, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite Esencial de Menta. Con IVA incluido. Presentación 15ml = $14.400 COP. Equiv. aprox. $960.000/kg.' },
+
+    // Sumiquim S.A.S — Kamel A. Hernández +57 316 7488717 — precios USD sin IVA
+    { ingId: 'cct', provider: 'Sumiquim S.A.S', price: 13.50, currency: 'USD', moq: 25, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'WITARIX MCT 60/40. Sin IVA. Contacto: Kamel A. Hernández +57 316 7488717.' },
+    { ingId: 'squalane', provider: 'Sumiquim S.A.S', price: 52.50, currency: 'USD', moq: 5, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Escualano Vegetal de oliva. Sin IVA. Contacto: Kamel A. Hernández.' },
+    { ingId: 'grapeseed', provider: 'Sumiquim S.A.S', price: 11.50, currency: 'USD', moq: 25, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Uva Refinado. Sin IVA. Contacto: Kamel A. Hernández.' },
+    { ingId: 'baku', provider: 'Sumiquim S.A.S', price: 320, currency: 'USD', moq: 1, spec: 'warn', status: 'negociando', compat: 'no', notes: 'STEVISSE x1 kg — alternativa retinoid-like, NO es Bakuchiol puro. Sin IVA. Verificar perfil INCI antes de usar.' },
+    { ingId: 'baku', provider: 'Sumiquim S.A.S', price: 300, currency: 'USD', moq: 25, spec: 'warn', status: 'negociando', compat: 'no', notes: 'STEVISSE x25 kg — alternativa retinoid-like, NO es Bakuchiol puro. Sin IVA. Precio por volumen.' },
+    { ingId: 'toco', provider: 'Sumiquim S.A.S', price: 195, currency: 'USD', moq: 5, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'SKIN FEEL TOCO x5 kg — mezcla tocoferoles en aceite de girasol. Sin IVA. Verificar concentración.' },
+    { ingId: 'toco', provider: 'Sumiquim S.A.S', price: 191, currency: 'USD', moq: 25, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'SKIN FEEL TOCO x25 kg — mezcla tocoferoles en aceite de girasol. Sin IVA.' },
+
+    // SUMILAB — Andrea Morales +57 310 4546314
+    { ingId: 'baku', provider: 'SUMILAB', price: 4500000, currency: 'COP', moq: 1, spec: 'warn', status: 'negociando', compat: 'no', notes: 'Bakuchiol 60% pureza. + IVA. Lead time 25–32 días. Fórmula requiere ≥95%. Contacto: Andrea Morales +57 310 4546314.' },
+    { ingId: 'grapeseed', provider: 'SUMILAB', price: 65000, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Semilla de Uva. + IVA. En stock. Contacto: Andrea Morales +57 310 4546314.' },
+
+    // Pochteca Colombia
+    { ingId: 'cct', provider: 'Pochteca Colombia', price: 38000, currency: 'COP', moq: 190, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'CCT (Triglicérido Caprílico). + IVA. Mínimo: tambor x 190 kg.' },
+    { ingId: 'oleic', provider: 'Pochteca Colombia', price: 14000, currency: 'COP', moq: 180, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ácido Oleico Premium. + IVA. Mínimo: tambor x 180 kg.' },
+
+    // G&M Química — Angela Pantoja +57 314 7447988 — precios sin IVA
+    { ingId: 'cct', provider: 'G&M Química', price: 88100, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'CAPRIXSOL TCC. Sin IVA. Con IVA: $104.839/kg. Contacto: Angela Pantoja +57 314 7447988.' },
+    { ingId: 'grapeseed', provider: 'G&M Química', price: 92700, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite Semillas de Uva FITO-47A. Sin IVA. Con IVA: $110.313/kg.' },
+    { ingId: 'saw', provider: 'G&M Química', price: 88000, currency: 'COP', moq: 5, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ext. HG. Saw Palmetto. Sin IVA. Con IVA: $104.720/kg. MOQ 5 kg.' },
+    { ingId: 'rosemary', provider: 'G&M Química', price: 148200, currency: 'COP', moq: 0.25, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'A.E. de Romero FITO-85H. Sin IVA. Con IVA: $176.358/kg. MOQ 250 g.' },
+    { ingId: 'ginseng', provider: 'G&M Química', price: 73400, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ext. HG. de Ginseng. Sin IVA. Con IVA: $87.346/kg.' },
+    { ingId: 'mentha', provider: 'G&M Química', price: 384800, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'A.E. Menta Piperita FITO28A. Sin IVA. Con IVA: $457.912/kg.' },
+
+    // Laboratorios Phitother S.A.S — Fany +57 313 4668206 — Cotiz. 12775 — extractos en aceite, sin IVA
+    { ingId: 'rosemary', provider: 'Laboratorios Phitother S.A.S', price: 110200, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Romero (HO) PHITOEX-O — extracto en aceite. Sin IVA (+19%). Entrega inmediata. Cotiz. 12775. Contacto: Fany +57 313 4668206.' },
+    { ingId: 'mentha', provider: 'Laboratorios Phitother S.A.S', price: 112700, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Menta (Yerbabuena) (HO) PHITOEX-O — extracto en aceite. Sin IVA (+19%). Entrega inmediata. Cotiz. 12775.' },
+    { ingId: 'toco', provider: 'Laboratorios Phitother S.A.S', price: 131500, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Vitamina E PHITOEX-O. IVA: 0%. Entrega inmediata. Cotiz. 12775.' },
+    { ingId: 'ginseng', provider: 'Laboratorios Phitother S.A.S', price: 169000, currency: 'COP', moq: 10, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ginseng (RA) PHITOEX-O — extracto en aceite. Sin IVA (+19%). MOQ 10 kg — fabricación por encargo, aprox. 2 meses. Cotiz. 12775.' },
+    { ingId: 'grapeseed', provider: 'Laboratorios Phitother S.A.S', price: 105500, currency: 'COP', moq: 10, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Uva (FR) PHITOEX-O — extracto en aceite. Sin IVA (+19%). MOQ 10 kg — fabricación por encargo, aprox. 2 meses. Cotiz. 12775.' },
+
+    // Aromatheka — Cotiz. ATK 2431-26 — sin IVA, USD a TRM del día, válido 30 días
+    { ingId: 'baku', provider: 'Aromatheka', price: 780, currency: 'USD', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'ACTIGOLD Bakuchiol ≥98%. Sin IVA (+19%). USD a TRM del día. Cotiz. ATK 2431-26. Válido 30 días.' },
+    { ingId: 'saw', provider: 'Aromatheka', price: 295, currency: 'USD', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Serenoa Serrulata (Saw Palmetto) — aceite de fruto. Sin IVA (+19%). Cotiz. ATK 2431-26.' },
+    { ingId: 'grapeseed', provider: 'Aromatheka', price: 89400, currency: 'COP', moq: 4, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite de Semilla de Uva. Sin IVA (+19%). MOQ 4 kg. Cotiz. ATK 2431-26.' },
+    { ingId: 'mentha', provider: 'Aromatheka', price: 187000, currency: 'COP', moq: 4, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite Esencial de Menta Piperita. Sin IVA (+19%). MOQ 4 kg. Cotiz. ATK 2431-26.' },
+
+    // Shaanxi Dennis Biotechnology (China) — Daisy Wang
+    { ingId: 'iso', provider: 'Shaanxi Dennis Biotechnology', price: 90, currency: 'USD', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Fucoxantina 50% — liposoluble. Contacto: Daisy Wang. Pago: Insurance order o TT. HALAL certificado.' },
+    { ingId: 'iso', provider: 'Shaanxi Dennis Biotechnology', price: 239.5, currency: 'USD', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Fucoxantina 98% — liposoluble. Contacto: Daisy Wang. HALAL certificado.' },
+
+    // Wellnature Biotech Co., Ltd. (China) — Candice Wang
+    { ingId: 'ginseng', provider: 'Wellnature Biotech Co., Ltd.', price: 760, currency: 'USD', moq: 10, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Extracto de Ginseng, Ginsenosides ≥10%. Contacto: Candice Wang. DAP Colombia. Entrega ~6 días. Pago T/T Trade Assurance.' },
+
+    // Ji'an Zhongxiang Natural Plants Co., Ltd. (China) — Jennie zx — aceite convencional, NO CO₂
+    { ingId: 'ginseng', provider: "Ji'an Zhongxiang Natural Plants Co., Ltd.", price: 160, currency: 'USD', moq: 0, spec: 'warn', status: 'negociando', compat: 'no', notes: 'Aceite de Ginseng (extracto oleoso, no CO₂). Contacto: Jennie zx. Solo express, aduanas por comprador. Forma aceite ≠ CO₂.' },
+    { ingId: 'rosemary', provider: "Ji'an Zhongxiang Natural Plants Co., Ltd.", price: 185, currency: 'USD', moq: 0, spec: 'warn', status: 'negociando', compat: 'no', notes: 'Aceite de Romero (extracto oleoso, no CO₂). Contacto: Jennie zx. Solo express, aduanas por comprador. Forma aceite ≠ CO₂.' },
+
+    // Shaanxi Runcuize Biotechnology (China) — Rose Chen
+    { ingId: 'baku', provider: 'Shaanxi Runcuize Biotechnology', price: 860, currency: 'USD', moq: 0, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Bakuchiol 98% HPLC — psoralenos ND. Contacto: Rose Chen. Muestra 5 g gratis (envío por comprador). COA disponible.' },
   ];
 
   const DEFAULT_HYBRID = {
