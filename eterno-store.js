@@ -72,9 +72,9 @@
     // G&M Química — Angela Pantoja +57 314 7447988 — precios sin IVA
     { ingId: 'cct', provider: 'G&M Química', price: 88100, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'CAPRIXSOL TCC. Sin IVA. Con IVA: $104.839/kg. Contacto: Angela Pantoja +57 314 7447988.' },
     { ingId: 'grapeseed', provider: 'G&M Química', price: 92700, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Aceite Semillas de Uva FITO-47A. Sin IVA. Con IVA: $110.313/kg.' },
-    { ingId: 'saw', provider: 'G&M Química', price: 88000, currency: 'COP', moq: 5, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ext. HG. Saw Palmetto. Sin IVA. Con IVA: $104.720/kg. MOQ 5 kg.' },
+    { ingId: 'saw', provider: 'G&M Química', price: 88000, currency: 'COP', moq: 5, spec: 'fail', status: 'cotizado', compat: 'no', notes: 'Ext. HG. Saw Palmetto. Sin IVA. Con IVA: $104.720/kg. MOQ 5 kg. ⚠️ HG = hidroglicólico — no compatible con fórmula anhidra.' },
     { ingId: 'rosemary', provider: 'G&M Química', price: 148200, currency: 'COP', moq: 0.25, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'A.E. de Romero FITO-85H. Sin IVA. Con IVA: $176.358/kg. MOQ 250 g.' },
-    { ingId: 'ginseng', provider: 'G&M Química', price: 73400, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'Ext. HG. de Ginseng. Sin IVA. Con IVA: $87.346/kg.' },
+    { ingId: 'ginseng', provider: 'G&M Química', price: 73400, currency: 'COP', moq: 1, spec: 'fail', status: 'cotizado', compat: 'no', notes: 'Ext. HG. de Ginseng. Sin IVA. Con IVA: $87.346/kg. ⚠️ HG = hidroglicólico — no compatible con fórmula anhidra.' },
     { ingId: 'mentha', provider: 'G&M Química', price: 384800, currency: 'COP', moq: 1, spec: 'ok', status: 'cotizado', compat: 'yes', notes: 'A.E. Menta Piperita FITO28A. Sin IVA. Con IVA: $457.912/kg.' },
 
     // Laboratorios Phitother S.A.S — Fany +57 313 4668206 — Cotiz. 12775 — extractos en aceite, sin IVA
