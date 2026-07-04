@@ -64,6 +64,9 @@
       <button type="button" class="tab" data-tab="t5">Riesgos</button>
     </div>
 
+    <!-- Alerta de faltantes -->
+    <div id="missingBanner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px"></div>
+
     <!-- Matriz dinámica de proveedores -->
     <div id="t1" class="panel active">
       <div class="table-wrap" id="picksTableWrap"></div>
@@ -184,7 +187,7 @@
     ];
 
     function getLoteKg() { return +document.getElementById('loteKg').value || 10; }
-    function getCopRate() { return +document.getElementById('copRateD').value || db.settings.copRate || 4200; }
+    function getCopRate() { return +document.getElementById('copRateD').value || db.settings.fxRate || db.settings.copRate || EternoStore.DEFAULT_FX_RATE; }
     function getLandedPct() { return +(document.getElementById('landedPct')?.value) ?? (db.settings.importMarkupPct ?? 25); }
     function landedMult() { return 1 + getLandedPct() / 100; }
 
@@ -636,21 +639,6 @@
       };
     });
 
-    document.getElementById('btnAutoCheapest').onclick = () => {
-      const ap = allPrices();
-      const providers = Object.keys(ap);
-      db.formula.forEach(ing => {
-        const ingProviders = providers.filter(p => ap[p][ing.id] != null);
-        if (!ingProviders.length) return;
-        const cheapest = ingProviders.reduce((best, p) =>
-          ap[p][ing.id] < ap[best][ing.id] ? p : best
-        );
-        EternoStore.savePick(db, ing.id, cheapest);
-      });
-      renderAll();
-      EternoStore.toast('Seleccionado el proveedor más barato por ingrediente');
-    };
-
     document.getElementById('btnSave').onclick = () => {
       db.settings.importMarkupPct = getLandedPct();
       db.settings.density = +document.getElementById('densityIn').value;
@@ -667,13 +655,49 @@
     // Inicializar controles desde db
     const landedInit = document.getElementById('landedPct');
     if (landedInit) {
-      landedInit.value = db.settings.importMarkupPct ?? 25;
+      landedInit.value = db.settings.importMarkupPct ?? 30;
       document.getElementById('landedLbl').textContent = landedInit.value + '%';
     }
-    document.getElementById('densityIn').value = db.settings.density ?? 0.9;
-    document.getElementById('copRateD').value = db.settings.copRate || 4200;
+    document.getElementById('densityIn').value  = db.settings.density ?? 0.92;
+    document.getElementById('copRateD').value   = db.settings.fxRate || db.settings.copRate || EternoStore.DEFAULT_FX_RATE;
+
+    // Banner de ingredientes sin cotización
+    function renderMissingBanner() {
+      const missing = EternoStore.getMissingIngredients(db);
+      const el = document.getElementById('missingBanner');
+      if (!missing.length) { el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      el.innerHTML = '<strong>⚠ Ingredientes SIN cotización compatible</strong> — bloquean el pedido: ' +
+        missing.map(i => `<span style="background:#ffc107;padding:2px 7px;border-radius:4px;margin:2px;font-weight:600">${i.name}</span>`).join(' ') +
+        ' <a href="quotation_tracker.html" style="margin-left:8px">→ Agregar cotizaciones</a>';
+    }
+
+    // Sobrescribir auto-pick: usa landed cost, no FOB
+    document.getElementById('btnAutoCheapest').onclick = () => {
+      const ap = allPrices();
+      const providers = Object.keys(ap);
+      db.formula.forEach(ing => {
+        const ingProviders = providers.filter(p => ap[p][ing.id] != null);
+        if (!ingProviders.length) return;
+        const cheapest = ingProviders.reduce((best, p) => {
+          const lp  = EternoStore.landedPrice(ap[p][ing.id], p, db.settings);
+          const blp = EternoStore.landedPrice(ap[best][ing.id], best, db.settings);
+          return lp < blp ? p : best;
+        });
+        EternoStore.savePick(db, ing.id, cheapest);
+      });
+      renderAll();
+      EternoStore.toast('Seleccionado más barato por costo landed');
+    };
 
     bindControls();
+    renderMissingBanner();
+    const _origRenderAll = renderAll;
+    // patch renderAll to also refresh banner
+    (function() {
+      const orig = renderAll;
+      renderAll = function() { orig(); renderMissingBanner(); };
+    })();
     renderAll();
   </script>
 </body>

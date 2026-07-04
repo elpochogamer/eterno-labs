@@ -79,8 +79,25 @@
         <datalist id="provList"></datalist>
       </div>
       <div class="field">
-        <label>Precio USD/kg</label>
+        <label>Precio / kg</label>
         <input type="number" id="fPrice" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label>Moneda</label>
+        <select id="fCurrency">
+          <option value="USD">USD</option>
+          <option value="COP">COP</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Incoterm</label>
+        <select id="fIncoterm">
+          <option value="EXW">EXW</option>
+          <option value="FOB">FOB</option>
+          <option value="CIF">CIF</option>
+          <option value="DDP">DDP</option>
+          <option value="DAP">DAP</option>
+        </select>
       </div>
       <div class="field">
         <label>MOQ (kg)</label>
@@ -139,10 +156,9 @@
     const ST = { cotizado: ['b-pend', 'Cotizado'], negociando: ['b-warn', 'Negociando'], aprobado: ['b-ok', 'Aprobado'], descartado: ['b-err', 'Descartado'] };
     const SP = { ok: ['b-ok', 'OK'], warn: ['b-warn', 'Revisar'], fail: ['b-err', 'No cumple'], pending: ['b-pend', 'Pendiente'] };
     const CP = { yes: ['b-ok', 'Compatible'], no: ['b-err', 'Incompatible'], pending: ['b-pend', 'Pendiente'] };
-    const BUCKET = { p1: ['b-carrier', 'P1'], p2: ['b-active', 'P2'], local: ['b-ao', 'Local'] };
-    function bucketBadge(q) {
-      const [cls, lbl] = BUCKET[EternoStore.detectBucket(q)] || ['b-pend', '?'];
-      return `<span class="badge ${cls}">${lbl}</span>`;
+    function currencyBadge(q) {
+      const cur = q.currencyOriginal || q.currency || 'USD';
+      return cur === 'COP' ? '<span class="badge b-ao">COP</span>' : '<span class="badge b-carrier">USD</span>';
     }
 
     let db = EternoStore.loadDb();
@@ -225,8 +241,8 @@
       document.getElementById('tbody').innerHTML = rows.map(ing => {
         const b = ing.best;
         const prov = b
-          ? `${bucketBadge(b)} <strong>${esc(b.provider)}</strong>${ing.allQ.length > 1 ? ` <span class="ghost">+${ing.allQ.length - 1}</span>` : ''}`
-          : (ing.raw ? `${bucketBadge(ing.raw)} <strong>${esc(ing.raw.provider)}</strong> <span class="badge b-err">Incompatible</span>` : '<span class="ghost">Sin cot.</span>');
+          ? `${currencyBadge(b)} <strong>${esc(b.provider)}</strong>${ing.allQ.length > 1 ? ` <span class="ghost">+${ing.allQ.length - 1}</span>` : ''}`
+          : (ing.raw ? `${currencyBadge(ing.raw)} <strong>${esc(ing.raw.provider)}</strong> <span class="badge b-err">Incompatible</span>` : '<span class="ghost">Sin cot.</span>');
         return `<tr>
           <td>
             <div style="font-weight:500">${esc(ing.name)}</div>
@@ -276,7 +292,9 @@
         `<option value="${i.id}"${i.id === (entry?.ingId || ingId) ? ' selected' : ''}>${esc(i.name)}</option>`
       ).join('');
       document.getElementById('fProv').value = entry?.provider || '';
-      document.getElementById('fPrice').value = entry?.price ?? '';
+      document.getElementById('fPrice').value = entry ? (entry.priceOriginal ?? entry.price) : '';
+      document.getElementById('fCurrency').value = entry?.currencyOriginal || entry?.currency || 'USD';
+      document.getElementById('fIncoterm').value = entry?.incoterm || 'EXW';
       document.getElementById('fMoq').value = entry?.moq ?? 1;
       document.getElementById('fSpec').value = entry?.spec || 'pending';
       document.getElementById('fStatus').value = entry?.status || 'cotizado';
@@ -296,7 +314,7 @@
       document.getElementById('listTitle').textContent = ing?.name || ingId;
       document.getElementById('listBody').innerHTML = list.length ? list.map(q => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px">
-          <strong>${esc(q.provider)}</strong> — $${q.price}/kg · MOQ ${q.moq}kg<br>
+          <strong>${esc(q.provider)}</strong> — $${q.price}/kg USD${q.currencyOriginal === 'COP' ? ` (orig. ${Math.round(q.priceOriginal).toLocaleString('es-CO')} COP)` : ''} · MOQ ${q.moq}kg · ${q.incoterm || 'EXW'}<br>
           ${badge(ST, q.status)} ${badge(SP, q.spec)} ${badge(CP, q.compat)}
           ${q.notes ? '<br><span class="ghost">' + esc(q.notes) + '</span>' : ''}
           <div style="margin-top:8px;display:flex;gap:6px">
@@ -339,6 +357,7 @@
       const ingId = document.getElementById('fIng').value;
       const provider = document.getElementById('fProv').value.trim();
       const price = parseFloat(document.getElementById('fPrice').value);
+      const currency = document.getElementById('fCurrency').value;
       const moq = parseFloat(document.getElementById('fMoq').value) || 1;
       if (!provider || !(price > 0)) { alert('Proveedor y precio obligatorios'); return; }
       const entry = {
@@ -346,13 +365,17 @@
         ingId,
         provider,
         price,
+        currency,
         moq,
+        incoterm: document.getElementById('fIncoterm').value,
         spec: document.getElementById('fSpec').value,
         status: document.getElementById('fStatus').value,
         compat: document.getElementById('fCompat').value,
         notes: document.getElementById('fNotes').value.trim(),
         date: new Date().toLocaleDateString('es-CO'),
       };
+      delete entry.priceOriginal; delete entry.currencyOriginal; delete entry.fxRateUsed; delete entry._normalized;
+      EternoStore.normalizeQuotation(entry, db.settings.fxRate);
       const idx = db.quotations.findIndex(q => q.id === editId);
       if (idx >= 0) db.quotations[idx] = entry;
       else db.quotations.push(entry);
