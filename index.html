@@ -3,123 +3,118 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eterno — Panel de formulación y costos</title>
-  <link rel="stylesheet" href="eterno.css">
+  <title>Eterno Labs — Panel general</title>
+  <link rel="stylesheet" href="./eterno-ui.css">
 </head>
 <body>
   <div class="app-shell">
-    <nav class="app-nav">
-      <div class="brand">
-        Eterno
-        <span>Aceite capilar · cotizaciones y costos</span>
-      </div>
-      <div class="nav-links">
-        <a href="index.html" class="active">Inicio</a>
-        <a href="quotation_tracker.html">Cotizaciones</a>
-        <a href="supplier_cost_comparison_dashboard.html">Comparador</a>
-        <a href="formula_final.html">Fórmula</a>
-        <a href="purchase-order.html">Compra</a>
-      </div>
-    </nav>
+    <div id="nav-mount"></div>
 
     <header class="page-header">
       <div>
         <h1 class="page-title">Panel Eterno</h1>
-        <p class="page-sub">Datos guardados en tu navegador (localStorage). Exporta/importa JSON como respaldo.</p>
+        <p class="page-sub">Estado del pedido, costo del lote y accesos rápidos. Datos guardados solo en este navegador (localStorage) — usa Exportar respaldo con frecuencia.</p>
       </div>
     </header>
 
     <div class="metrics" id="homeMetrics"></div>
 
+    <div id="missingBanner"></div>
+
+    <div class="decision-grid">
+      <div class="card">
+        <h3 style="margin-bottom:12px;font-size:15px">Accesos rápidos</h3>
+        <div class="toolbar">
+          <a class="btn btn-primary" href="quotation_tracker.html">Gestionar cotizaciones</a>
+          <a class="btn" href="supplier_cost_comparison_dashboard.html">Comparador de proveedores</a>
+          <a class="btn" href="formula_final.html">Ver fórmula</a>
+          <a class="btn" href="purchase-order.html">Orden de compra</a>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px;font-size:15px">Cotizaciones recientes</h3>
+        <div id="recentList"></div>
+      </div>
+    </div>
+
     <div class="db-panel">
-      <h4>Base de datos local</h4>
+      <h4>Zona de datos — acciones irreversibles</h4>
+      <p class="note" style="margin-top:0">El respaldo diario (Exportar/Importar) está en la barra superior. Aquí solo vive el reinicio completo de la base de datos.</p>
       <div class="db-actions">
-        <button type="button" class="btn btn-primary" id="btnExportDb">Exportar JSON (backup)</button>
-        <button type="button" class="btn" id="btnImportDb">Importar JSON</button>
-        <button type="button" class="btn" id="btnImportMerge">Importar y fusionar</button>
         <button type="button" class="btn btn-danger" id="btnResetDb">Restaurar datos iniciales</button>
       </div>
       <p class="db-meta" id="dbMeta"></p>
-      <input type="file" id="fileImport" accept=".json,application/json">
-    </div>
-
-    <div class="card">
-      <h3 style="margin-bottom:12px;font-size:15px">Accesos rápidos</h3>
-      <div class="toolbar">
-        <a class="btn btn-primary" href="quotation_tracker.html">Gestionar cotizaciones</a>
-        <a class="btn" href="supplier_cost_comparison_dashboard.html">Ver comparador de proveedores</a>
-        <a class="btn" href="evaluacion_cientifica_formula_v4_1.md">Evaluación científica (MD)</a>
-      </div>
     </div>
   </div>
 
-  <script src="eterno-store.js"></script>
+  <script src="./eterno-store.js"></script>
+  <script src="./eterno-nav.js"></script>
   <script>
     const db = EternoStore.loadDb();
     const total  = EternoStore.sumPct(db);
     const factor = EternoStore.pctFactor(db);
-    const approved = db.quotations.filter(q => q.status === 'aprobado').length;
     const ap = EternoStore.getPricesFromQuotations(db);
     const providers = Object.keys(ap);
     const covered = db.formula.filter(ing => providers.some(p => ap[p][ing.id] != null)).length;
     const missing = EternoStore.getMissingIngredients(db);
 
-    document.getElementById('homeMetrics').innerHTML = `
-      <div class="metric"><div class="metric-label">Cotizaciones</div><div class="metric-value">${db.quotations.filter(q=>q.status!=='obsoleto — fuera de fórmula').length}</div><div class="metric-sub">${approved} aprobadas</div></div>
-      <div class="metric"><div class="metric-label">Ingredientes con precio</div><div class="metric-value">${covered}/${db.formula.length}</div><div class="metric-sub">${missing.length ? missing.length + ' sin cotización' : 'todos cubiertos'}</div></div>
-      <div class="metric"><div class="metric-label">Fórmula total</div><div class="metric-value">${total.toFixed(2)}%</div><div class="metric-sub">${Math.abs(total - 100) < 0.01 ? 'OK · lote base ' + EternoStore.DEFAULT_BATCH_G + ' g' : 'Suma ≠ 100'}</div></div>
-      <div class="metric"><div class="metric-label">COGS ref. (picks)</div><div class="metric-value" id="homeCogs">—</div><div class="metric-sub">USD/kg fórmula</div></div>
-    `;
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
 
-    let cogs = 0;
+    let cogsPerKg = 0;
     db.formula.forEach(ing => {
       const pct  = (ing.pct / 100) * factor;
       const pick = db.picks?.[ing.id];
       const pr   = (pick && ap[pick]) ? ap[pick][ing.id] : null;
-      if (pr != null) cogs += pct * pr;
+      if (pr != null) cogsPerKg += pct * EternoStore.landedPrice(pr, pick, db.settings);
     });
-    document.getElementById('homeCogs').textContent = '$' + cogs.toFixed(2);
+    const batchKg = (db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G) / 1000;
+    const batchCost = cogsPerKg * batchKg;
+
+    const lastBackup = db.settings.lastBackupAt;
+    const backupDue = EternoStore.shouldShowBackupReminder(db);
+
+    document.getElementById('homeMetrics').innerHTML = `
+      <div class="metric"><div class="metric-label">Estado del pedido</div><div class="metric-value">${missing.length ? missing.length : '✓'}</div><div class="metric-sub">${missing.length ? 'ingredientes sin cotización' : 'PO listo para generar'}</div></div>
+      <div class="metric"><div class="metric-label">Ingredientes con precio</div><div class="metric-value">${covered}/${db.formula.length}</div><div class="metric-sub">${Math.abs(total - 100) < 0.01 ? 'fórmula 100% OK' : 'fórmula suma ' + total.toFixed(2) + '%'}</div></div>
+      <div class="metric"><div class="metric-label">Costo del lote actual</div><div class="metric-value">$${batchCost.toFixed(2)}</div><div class="metric-sub">${db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G} g · landed USD</div></div>
+      <div class="metric"><div class="metric-label">Último backup</div><div class="metric-value" style="font-size:15px">${lastBackup ? new Date(lastBackup).toLocaleDateString('es-CO') : 'Nunca'}</div><div class="metric-sub" style="color:${backupDue ? 'var(--amber-600)' : 'var(--dim)'}">${backupDue ? 'recomendado exportar' : 'al día'}</div></div>
+    `;
 
     if (missing.length) {
-      const banner = document.createElement('div');
-      banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px';
-      banner.innerHTML = '<strong>⚠ Ingredientes sin cotización:</strong> ' +
-        missing.map(i => '<span style="background:#ffc107;padding:2px 6px;border-radius:4px;margin:2px">' + i.name + '</span>').join(' ');
-      document.querySelector('.db-panel').before(banner);
+      document.getElementById('missingBanner').innerHTML = `
+        <div class="banner banner-warn">
+          <div>
+            <div class="banner-title">⚠ Ingredientes sin cotización compatible</div>
+            <div>${missing.map(i => `<a href="quotation_tracker.html?add=${encodeURIComponent(i.id)}" class="badge b-warn" style="margin:2px">${esc(i.name)}</a>`).join(' ')}</div>
+          </div>
+        </div>`;
     }
 
+    const recent = db.quotations.slice(-5).reverse();
+    document.getElementById('recentList').innerHTML = recent.length
+      ? recent.map(q => {
+          const ing = db.formula.find(i => i.id === q.ingId);
+          const b = EternoStore.quotationStateBadge(q);
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px">
+            <span><strong>${esc(ing ? ing.name : q.ingId)}</strong> — ${esc(q.provider)}</span>
+            <span><span class="badge ${b.cls}">${b.label}</span> <span class="ghost">$${Number(q.price).toFixed(2)}/kg</span></span>
+          </div>`;
+        }).join('')
+      : '<p class="note" style="margin:0">Aún no hay cotizaciones registradas. <a href="quotation_tracker.html">Agregar la primera →</a></p>';
+
     document.getElementById('dbMeta').textContent =
-      `Última actualización: ${db.meta.updatedAt || '—'} · Clave: ${EternoStore.DB_KEY}`;
+      `Última actualización: ${db.meta.updatedAt || '—'} · Schema v${db.version}`;
 
-    document.getElementById('btnExportDb').onclick = () => {
-      EternoStore.exportJson(EternoStore.loadDb());
-      EternoStore.toast('Base de datos exportada');
-    };
-
-    document.getElementById('btnImportDb').onclick = () => {
-      document.getElementById('fileImport').dataset.merge = '0';
-      document.getElementById('fileImport').click();
-    };
-    document.getElementById('btnImportMerge').onclick = () => {
-      document.getElementById('fileImport').dataset.merge = '1';
-      document.getElementById('fileImport').click();
-    };
-
-    document.getElementById('fileImport').onchange = async (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      try {
-        await EternoStore.importJsonFile(f, e.target.dataset.merge === '1');
-        EternoStore.toast('Importación correcta');
-        location.reload();
-      } catch (err) {
-        alert('Error al importar: ' + err.message);
-      }
-      e.target.value = '';
-    };
-
-    document.getElementById('btnResetDb').onclick = () => {
-      if (!confirm('¿Restaurar cotizaciones y ajustes por defecto? Se perderán cambios no exportados.')) return;
+    document.getElementById('btnResetDb').onclick = async () => {
+      const ok = await EternoStore.confirmDialog({
+        title: 'Restaurar datos iniciales',
+        message: 'Se perderán todas las cotizaciones, proveedores y selecciones que no hayas exportado. Esta acción no se puede deshacer.',
+        okLabel: 'Restaurar de todas formas',
+        danger: true,
+      });
+      if (!ok) return;
       EternoStore.saveDb(EternoStore.defaultDb());
       EternoStore.toast('Datos restaurados');
       location.reload();

@@ -1,248 +1,160 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #0c0e0d;
-  --s1: #131513;
-  --s2: #191c19;
-  --s3: #1e221e;
-  --bd: rgba(255,255,255,.07);
-  --bd2: rgba(255,255,255,.13);
-  --t1: #e6ebe4;
-  --t2: #7a8a78;
-  --t3: #4a5648;
-  --green: #7cd67c;
-  --gbg: rgba(124,214,124,.1);
-  --gbd: rgba(124,214,124,.25);
-  --red: #e06868;
-  --rbg: rgba(224,104,104,.1);
-  --rbd: rgba(224,104,104,.25);
-  --amber: #d4a040;
-  --abg: rgba(212,160,64,.1);
-  --abd: rgba(212,160,64,.25);
-  --teal: #4dcbaa;
-  --tbg: rgba(77,203,170,.1);
-  --tbd: rgba(77,203,170,.25);
-  --r: 8px;
-  --rl: 12px;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--t1);
-  padding:28px 22px;font-size:13px;line-height:1.55;min-height:100vh}
-h1{font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;
-  letter-spacing:-.02em;color:var(--green);margin-bottom:3px}
-.sub{font-size:12px;color:var(--t2);margin-bottom:22px}
-
-.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:22px}
-.tab{padding:6px 14px;font-size:11px;font-family:'DM Mono',monospace;
-  border:1px solid var(--bd2);border-radius:var(--r);cursor:pointer;
-  background:transparent;color:var(--t2);letter-spacing:.03em;transition:all .15s}
-.tab:hover{color:var(--t1)}
-.tab.on{background:var(--s2);color:var(--green);border-color:var(--green)}
-.pnl{display:none}
-.pnl.on{display:block}
-
-.lbl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;
-  color:var(--t3);text-transform:uppercase;margin:20px 0 9px;
-  padding-bottom:6px;border-bottom:1px solid var(--bd)}
-
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
-.st{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:11px 13px}
-.st-v{font-family:'DM Serif Display',serif;font-size:26px;color:var(--green);line-height:1}
-.st-l{font-size:10px;color:var(--t2);margin-top:3px}
-
-.b{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;
-  font-size:10px;font-family:'DM Mono',monospace;font-weight:500;margin-right:4px}
-.bc{background:var(--rbg);color:var(--red);border:1px solid var(--rbd)}
-.bn{background:var(--gbg);color:var(--green);border:1px solid var(--gbd)}
-.bk{background:var(--tbg);color:var(--teal);border:1px solid var(--tbd)}
-.bw{background:var(--abg);color:var(--amber);border:1px solid var(--abd)}
-
-.card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rl);
-  padding:13px 15px;margin-bottom:8px}
-.card:hover{border-color:var(--bd2)}
-.card.cut{border-color:var(--rbd)}
-.card.add{border-color:var(--gbd)}
-.card.keep{border-color:var(--tbd)}
-.card.warn{border-color:var(--abd)}
-.ct{font-weight:600;font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.cb{font-size:12px;color:var(--t2);line-height:1.65}
-.cb strong{color:var(--t1)}
-
-.tbl{width:100%;border-collapse:collapse;margin-bottom:10px}
-.tbl th{background:var(--s2);font-family:'DM Mono',monospace;font-size:10px;
-  letter-spacing:.05em;color:var(--t2);padding:7px 10px;text-align:left;
-  font-weight:500;border-bottom:1px solid var(--bd2)}
-.tbl td{padding:8px 10px;font-size:12px;border-bottom:1px solid var(--bd);vertical-align:top}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:var(--s1)}
-.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.tl{color:var(--teal)}
-
-/* Formula rows */
-.fh{display:grid;grid-template-columns:2.4fr .45fr .45fr .65fr 2.2fr;gap:8px;
-  padding:0 12px 5px;font-family:'DM Mono',monospace;font-size:10px;color:var(--t2);
-  letter-spacing:.04em}
-.fr{display:grid;grid-template-columns:2.4fr .45fr .45fr .65fr 2.2fr;gap:8px;
-  align-items:start;padding:10px 12px;border:1px solid var(--bd);
-  border-radius:var(--r);margin-bottom:5px;font-size:12px}
-.fr:hover{border-color:var(--bd2);background:var(--s1)}
-.fr-n{font-weight:600}
-.fr-note{color:var(--t2);line-height:1.45;font-size:11px}
-.ph{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;
-  color:var(--t3);margin:13px 0 5px;text-transform:uppercase}
-
-.note{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);
-  padding:11px 14px;font-size:12px;color:var(--t2);margin-top:10px;line-height:1.65}
-.note strong{color:var(--t1)}
-
-/* Score bars */
-.sr{display:flex;align-items:center;gap:10px;margin-bottom:7px}
-.sl{font-size:12px;color:var(--t2);min-width:190px}
-.bw2{flex:1;height:3px;background:var(--s2);border-radius:2px;overflow:hidden}
-.bf{height:3px;border-radius:2px}
-.sv{font-family:'DM Mono',monospace;font-size:11px;min-width:38px;text-align:right;color:var(--green)}
-
-/* 2 col */
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.fc{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rl);padding:12px 14px}
-.fc-t{font-weight:600;font-size:13px;margin-bottom:8px}
-.fi{font-size:12px;color:var(--t2);margin-bottom:5px;padding-left:14px;
-  position:relative;line-height:1.5}
-.fi::before{content:'·';position:absolute;left:3px;color:var(--green)}
-.fc.win{border-color:var(--gbd)}
-
-/* Mech grid */
-.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.mc{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rl);padding:12px 13px}
-.mc-s{font-size:18px;font-weight:500;color:var(--green);margin-bottom:3px;font-family:'DM Serif Display',serif}
-.mc-t{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:4px}
-.mc-b{font-size:11px;color:var(--t2);line-height:1.5}
-
-@media(max-width:560px){
-  .stats{grid-template-columns:1fr 1fr}
-  .mg{grid-template-columns:1fr 1fr}
-  .two{grid-template-columns:1fr}
-  .fr,.fh{grid-template-columns:1.8fr .4fr .4fr 1.8fr}
-  .fr>*:nth-child(4),.fh>*:nth-child(4){display:none}
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eterno Labs — Fórmula final</title>
+  <link rel="stylesheet" href="./eterno-ui.css">
 </head>
 <body>
+  <div class="app-shell">
+    <div id="nav-mount"></div>
 
-<h1>Aceite Capilar — Fórmula Definitiva</h1>
-<div class="sub">Revisión crítica de concentraciones · decisiones por mecanismo · versión producible hoy</div>
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Aceite Capilar — Fórmula Definitiva</h1>
+        <p class="page-sub">13 ingredientes activos · proceso 100% lipofílico · costo en vivo según los picks actuales de proveedor.</p>
+      </div>
+      <div class="toolbar">
+        <div class="control-group">
+          <label style="font-size:12px;color:var(--muted)">Tamaño de lote (g)</label>
+          <input type="number" id="batchSizeIn" min="10" step="5" style="width:110px">
+        </div>
+        <button type="button" class="btn btn-primary" id="btnSaveBatch">Guardar como lote por defecto</button>
+      </div>
+    </header>
 
-<!-- FÓRMULA FINAL -->
-<div id="final" class="pnl on">
-  <div class="stats">
-    <div class="st"><div class="st-v">13</div><div class="st-l">ingredientes activos</div></div>
-    <div class="st"><div class="st-v">445 g</div><div class="st-l">lote base de referencia</div></div>
-    <div class="st"><div class="st-v">100.00%</div><div class="st-l">suma exacta</div></div>
-    <div class="st"><div class="st-v">7 fases</div><div class="st-l">proceso ordenado A→G</div></div>
-  </div>
+    <div class="metrics" id="formulaMetrics"></div>
 
-  <div class="note" style="margin-bottom:14px">
-    <strong>Fórmula v2 — vigente desde jul-2026.</strong>
-    Eliminados: Oleic Acid y Bakuchiol (fuera de fórmula, cotizaciones marcadas obsoletas).
-    Nuevos: <strong>Hemisqualane 24%</strong> y <strong>Melatonin 0.10%</strong> — requieren cotización.
-    CCT 37.15% · Squalane 8% · Ginseng 2% · Rosmarinus 0.75%.
-    Tocopherol y Ascorbyl Palmitate separados como ingredientes independientes.
-  </div>
+    <div id="missingNote"></div>
 
-  <div class="fh" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <span>Ingrediente / INCI</span><span>%</span><span>g / 445 g</span><span>Fase</span><span>Rol</span>
-  </div>
+    <div class="table-wrap">
+      <table class="responsive">
+        <thead>
+          <tr>
+            <th>Ingrediente / INCI</th>
+            <th style="text-align:center">Fase</th>
+            <th class="th-num">%</th>
+            <th class="th-num">g / lote</th>
+            <th class="th-num">Costo/kg</th>
+            <th class="th-num">Costo en lote</th>
+            <th>Racional</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
 
-  <div class="ph">Fase A — portadores base (82.15%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">CCT</div><div style="font-size:10px;color:var(--t2)">Caprylic/Capric Triglyceride</div></div>
-    <div>37.15</div><div class="ok">165.32</div><div><span class="b bk">A</span></div>
-    <div class="fr-note">Portador principal anhidro. Solubiliza todos los activos CO₂. Índice comedogénico 0. Fast-dry.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr;border-color:rgba(77,203,170,.3)">
-    <div><div class="fr-n">Hemisqualane <span class="b bk" style="margin-left:4px">NUEVO</span></div><div style="font-size:10px;color:var(--t2)">Hemisqualane</div></div>
-    <div>24.00</div><div class="ok">106.80</div><div><span class="b bk">A</span></div>
-    <div class="fr-note">Textura ultra-ligera (poliisobuteno C-11). Sensorial superior. Sin greasiness. Deja el squalane libre para claim.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Vitis Vinifera (Semilla de Uva)</div><div style="font-size:10px;color:var(--t2)">Vitis Vinifera Seed Oil</div></div>
-    <div>13.00</div><div class="ok">57.85</div><div><span class="b bk">A</span></div>
-    <div class="fr-note">OPC antioxidante. Textura seca. Anti-inflamatorio folicular. Índice comedogénico 1.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Squalane (Oliva)</div><div style="font-size:10px;color:var(--t2)">Squalane</div></div>
-    <div>8.00</div><div class="ok">35.60</div><div><span class="b bk">A</span></div>
-    <div class="fr-note">Emoliente premium. Índice comedogénico 0. Claim visible en etiqueta. Reducido vs v1 — hemisqualane asume rol textura.</div>
-  </div>
-
-  <div class="ph">Fase B — portador activo secundario (10%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Oryza Sativa (Salvado de Arroz)</div><div style="font-size:10px;color:var(--t2)">Oryza Sativa Bran Oil</div></div>
-    <div>10.00</div><div class="ok">44.50</div><div><span class="b bk">B</span></div>
-    <div class="fr-note">Gamma-oryzanol → anti-inflamatorio NF-κB. Portador económico con activo propio integrado.</div>
+    <div class="card" style="margin-top:16px">
+      <p class="note" style="margin-top:0">
+        <strong>Proceso:</strong> 100% lipofílico, sin agua. Mezcla en frío o hasta 40°C máx.
+        Orden: A → B → C (añadir Serenoa antes que Isochrysis) → D → E → F → G al final.
+      </p>
+    </div>
   </div>
 
-  <div class="ph">Fase C — activos CO₂ lipofílicos I (4%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr;border-color:rgba(212,160,64,.2)">
-    <div><div class="fr-n">Serenoa CO₂ (Saw Palmetto)</div><div style="font-size:10px;color:var(--t2)">Serenoa Serrulata Fruit Extract</div></div>
-    <div>2.00</div><div class="ok">8.90</div><div><span class="b bk">C</span></div>
-    <div class="fr-note">Inhibición enzimática 5-AR tipo I+II. Ácidos grasos libres. Evidencia RCT humana. CO₂ oil-soluble requerido.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr;border-color:rgba(77,203,170,.3)">
-    <div><div class="fr-n">Isochrysis CO₂</div><div style="font-size:10px;color:var(--t2)">Isochrysis Galbana Extract</div></div>
-    <div>2.00</div><div class="warn">8.90</div><div><span class="b bk">C</span></div>
-    <div class="fr-note">Fucoxantina → Wnt/β-catenin. DHA membrana folicular. Diferenciador absoluto de mercado. Liposoluble.</div>
-  </div>
+  <script src="./eterno-store.js"></script>
+  <script src="./eterno-nav.js"></script>
+  <script>
+    let db = EternoStore.loadDb();
 
-  <div class="ph">Fase D — activos CO₂ lipofílicos II (2.75%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Panax Ginseng CO₂</div><div style="font-size:10px;color:var(--t2)">Panax Ginseng Root Extract</div></div>
-    <div>2.00</div><div class="ok">8.90</div><div><span class="b bk">D</span></div>
-    <div class="fr-note">Ginsenósidos → estimula NO en papila dérmica. Vasodilatación independiente de TRPM8. Aumentado 1→2%.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Rosmarinus CO₂</div><div style="font-size:10px;color:var(--t2)">Rosmarinus Officinalis Leaf Extract</div></div>
-    <div>0.75</div><div class="ok">3.34</div><div><span class="b bk">D</span></div>
-    <div class="fr-note">Carnosic acid: anti-5α-R + COX-2 anti-inflamatorio. Reducido 1→0.75% — sigue en rango terapéutico.</div>
-  </div>
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+    const fmt = (n, d = 2) => Number(n).toFixed(d);
 
-  <div class="ph">Fase E — activo especial (0.10%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr;border-color:rgba(77,203,170,.3)">
-    <div><div class="fr-n">Melatonin <span class="b bk" style="margin-left:4px">NUEVO</span></div><div style="font-size:10px;color:var(--t2)">Melatonin</div></div>
-    <div>0.10</div><div class="warn">0.445</div><div><span class="b bk">E</span></div>
-    <div class="fr-note">Activa receptores MT en papila dérmica. Extend anágeno, reduce catágeno. Liposoluble a esta concentración. Rango clínico 0.05–0.1%.</div>
-  </div>
+    const PHASE_LABEL = {
+      A: 'Portadores base', B: 'Portador activo secundario', C: 'Activos CO₂ lipofílicos I',
+      D: 'Activos CO₂ lipofílicos II', E: 'Activo especial', F: 'Sistema antioxidante', G: 'Aceite esencial',
+    };
 
-  <div class="ph">Fase F — sistema antioxidante (0.80%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Tocopherol d-α</div><div style="font-size:10px;color:var(--t2)">Tocopherol</div></div>
-    <div>0.64</div><div class="ok">2.848</div><div><span class="b bk">F</span></div>
-    <div class="fr-note">Antioxidante lipídico primario. Protege PUFAs. Vida útil 18+ meses. Separado como ingrediente propio.</div>
-  </div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Ascorbyl Palmitate</div><div style="font-size:10px;color:var(--t2)">Ascorbyl Palmitate</div></div>
-    <div>0.16</div><div class="ok">0.712</div><div><span class="b bk">F</span></div>
-    <div class="fr-note">Vitamina C liposoluble. Sinérgico con tocoferol. Inhibe oxidación lipídica. Natural. Sin BHT.</div>
-  </div>
+    // Copy científico fijo — no editable por el usuario, no persiste en el store.
+    const RATIONALE = {
+      cct: 'Portador principal anhidro. Solubiliza todos los activos CO₂. Índice comedogénico 0. Fast-dry.',
+      hemisq: 'Textura ultra-ligera (poliisobuteno C-11). Sensorial superior. Sin greasiness. Deja el squalane libre para claim.',
+      squalane: 'Emoliente premium. Índice comedogénico 0. Claim visible en etiqueta.',
+      grapeseed: 'OPC antioxidante. Textura seca. Anti-inflamatorio folicular. Índice comedogénico 1.',
+      rice: 'Gamma-oryzanol → anti-inflamatorio NF-κB. Portador económico con activo propio integrado.',
+      saw: 'Inhibición enzimática 5-AR tipo I+II. Ácidos grasos libres. Evidencia RCT humana. CO₂ oil-soluble requerido.',
+      iso: 'Fucoxantina → Wnt/β-catenin. DHA membrana folicular. Diferenciador absoluto de mercado. Liposoluble.',
+      ginseng: 'Ginsenósidos → estimula NO en papila dérmica. Vasodilatación independiente de TRPM8.',
+      rosemary: 'Ácido carnósico: anti-5α-R + COX-2 anti-inflamatorio. Sigue en rango terapéutico a 0.75%.',
+      melatonin: 'Activa receptores MT en papila dérmica. Extiende anágeno, reduce catágeno. Rango clínico 0.05–0.1%.',
+      toco: 'Antioxidante lipídico primario. Protege PUFAs. Vida útil 18+ meses.',
+      ascpal: 'Vitamina C liposoluble. Sinérgico con tocoferol. Inhibe oxidación lipídica. Sin BHT.',
+      mentha: 'TRPM8 → vasodilatación + experiencia sensorial. Firma aromática del producto.',
+    };
 
-  <div class="ph">Fase G — aceite esencial (0.20%)</div>
-  <div class="fr" style="grid-template-columns:2.4fr .35fr .55fr .65fr 2.2fr">
-    <div><div class="fr-n">Mentha Piperita AE</div><div style="font-size:10px;color:var(--t2)">Mentha Piperita Oil</div></div>
-    <div>0.20</div><div class="ok">0.89</div><div><span class="b bk">G</span></div>
-    <div class="fr-note">TRPM8 → vasodilatación + experiencia sensorial. Firma aromática del producto. Reducido 4%→0.20% para base concentrada.</div>
-  </div>
+    function getBatchG() { return Number(document.getElementById('batchSizeIn').value) || EternoStore.DEFAULT_BATCH_G; }
 
-  <div class="note">
-    <strong>Total: 100.00% · 445.00 g lote base.</strong><br>
-    Proceso: 100% lipofílico, sin agua. Mezcla en frío o hasta 40°C máx.<br>
-    Orden: A → B → C (añadir Serenoa antes que Isochrysis) → D → E → F → G al final.<br>
-    <strong>Pendiente cotización:</strong> Hemisqualane, Melatonin, Ascorbyl Palmitate.
-  </div>
-</div>
+    function render() {
+      const batchG = getBatchG();
+      const factor = EternoStore.pctFactor(db);
+      const ap = EternoStore.getPricesFromQuotations(db);
+      const missing = EternoStore.getMissingIngredients(db);
+      const missingIds = new Set(missing.map(i => i.id));
 
+      let lastPhase = null;
+      let batchTotal = 0;
+      let coveredCount = 0;
+      const rowsHtml = db.formula.map(ing => {
+        const grams = EternoStore.gramsForBatch(ing.pct * factor, batchG);
+        const pick = db.picks?.[ing.id];
+        const priceKg = (pick && ap[pick]) ? ap[pick][ing.id] : null;
+        const landedKg = priceKg != null ? EternoStore.landedPrice(priceKg, pick, db.settings) : null;
+        const lineCost = landedKg != null ? landedKg * grams / 1000 : null;
+        if (lineCost != null) { batchTotal += lineCost; coveredCount++; }
+
+        let phaseHeader = '';
+        if (ing.phase !== lastPhase) {
+          lastPhase = ing.phase;
+          phaseHeader = `<tr><td colspan="7" style="background:var(--surface2);font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">Fase ${ing.phase} — ${PHASE_LABEL[ing.phase] || ''}</td></tr>`;
+        }
+
+        const costCell = lineCost != null
+          ? `$${fmt(lineCost)}`
+          : `<span class="ghost">—</span> <a class="compare-link" href="quotation_tracker.html?add=${encodeURIComponent(ing.id)}">+ Cotizar</a>`;
+
+        return phaseHeader + `<tr>
+          <td data-label="Ingrediente"><strong>${esc(ing.name)}</strong><div class="ghost">${esc(ing.inci)}</div></td>
+          <td data-label="Fase" style="text-align:center"><span class="badge b-carrier">${ing.phase}</span></td>
+          <td data-label="%" class="td-num">${(ing.pct * factor).toFixed(2)}%</td>
+          <td data-label="g / lote" class="td-num">${fmt(grams, 2)} g</td>
+          <td data-label="Costo/kg" class="td-num">${landedKg != null ? '$' + fmt(landedKg) : '<span class="ghost">—</span>'}</td>
+          <td data-label="Costo en lote" class="td-num">${costCell}</td>
+          <td data-label="Racional" style="font-size:12px;color:var(--muted);max-width:320px">${esc(RATIONALE[ing.id] || '—')}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('tbody').innerHTML = rowsHtml;
+      document.getElementById('tfoot').innerHTML = `<tr style="background:var(--surface2);font-weight:600">
+        <td colspan="5" style="text-align:right">Total lote ${batchG} g</td>
+        <td class="td-num">$${fmt(batchTotal)}</td>
+        <td></td>
+      </tr>`;
+
+      const total = EternoStore.sumPct(db);
+      document.getElementById('formulaMetrics').innerHTML = `
+        <div class="metric"><div class="metric-label">Ingredientes activos</div><div class="metric-value">${db.formula.length}</div><div class="metric-sub">${coveredCount}/${db.formula.length} con costo</div></div>
+        <div class="metric"><div class="metric-label">Lote de referencia</div><div class="metric-value">${batchG} g</div><div class="metric-sub">editable arriba</div></div>
+        <div class="metric"><div class="metric-label">Suma de fórmula</div><div class="metric-value">${total.toFixed(2)}%</div><div class="metric-sub">${Math.abs(total - 100) < 0.01 ? 'exacta' : 'normalizada por factor'}</div></div>
+        <div class="metric"><div class="metric-label">Costo total del lote</div><div class="metric-value">$${fmt(batchTotal)}</div><div class="metric-sub">según picks actuales</div></div>
+      `;
+
+      const el = document.getElementById('missingNote');
+      el.innerHTML = missing.length
+        ? `<div class="banner banner-warn"><div><div class="banner-title">Pendiente cotización</div>
+            ${missing.map(i => `<a class="badge b-warn" style="margin:2px" href="quotation_tracker.html?add=${encodeURIComponent(i.id)}">${esc(i.name)}</a>`).join(' ')}</div></div>`
+        : `<div class="banner banner-ok"><div><div class="banner-title">Todos los ingredientes tienen costo asignado</div></div></div>`;
+    }
+
+    document.getElementById('batchSizeIn').value = db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G;
+    document.getElementById('batchSizeIn').oninput = render;
+    document.getElementById('btnSaveBatch').onclick = () => {
+      EternoStore.updateSettings(db, { batchSizeG: getBatchG() });
+      EternoStore.toast('Lote por defecto actualizado');
+    };
+
+    render();
+  </script>
 </body>
 </html>

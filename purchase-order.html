@@ -3,39 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eterno — Orden de compra</title>
-  <link rel="stylesheet" href="eterno.css">
+  <title>Eterno Labs — Orden de compra</title>
+  <link rel="stylesheet" href="./eterno-ui.css">
   <style>
-    /* Estilos locales — solo lo que no cubre eterno.css */
+    /* Estilos locales — solo lo que no cubre eterno-ui.css */
     .po-controls { display:flex; flex-wrap:wrap; gap:20px; align-items:flex-end; margin-bottom:20px; }
     .po-controls .control-group { display:flex; flex-direction:column; gap:6px; }
     .po-controls label { font-size:12px; color:var(--muted); font-weight:600; }
     .po-controls input, .po-controls select { padding:8px 10px; }
 
-    .po-table table { width:100%; border-collapse:collapse; }
-    .po-table th, .po-table td { padding:10px 12px; }
-    .po-table .th-num, .po-table .td-num { text-align:right; }
-    .po-table tbody tr:hover { background:rgba(0,0,0,.02); }
     .po-table select { width:100%; max-width:240px; padding:6px 8px; font-size:13px; }
     .po-table input.qty { width:90px; padding:6px 8px; text-align:right; }
     .req-pill { font-size:11px; color:var(--muted); display:block; margin-top:2px; }
-    .moq-warn { color:#c0392b; font-weight:600; }
-    .line-loss { color:var(--muted); font-size:11px; display:block; }
-    .no-quote { color:#c0392b; font-size:12px; font-weight:600; }
+    .moq-warn { color:var(--err); font-weight:600; }
+    .no-quote { color:var(--err); font-size:12px; font-weight:600; }
 
-    .prov-summary { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; }
-    .prov-chip { background:var(--card,#fff); border:1px solid var(--border,#e5e5e5); border-radius:10px; padding:12px 16px; min-width:160px; }
-    .prov-chip .pc-name { font-size:13px; font-weight:600; }
-    .prov-chip .pc-amount { font-size:18px; font-weight:700; margin-top:2px; }
-    .prov-chip .pc-sub { font-size:11px; color:var(--muted); }
-
-    .po-doc-head { display:none; }
+    .po-doc { margin-top:16px; }
+    .po-doc-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:14px; padding-bottom:14px; border-bottom:2px solid var(--brand-800); }
+    .po-doc-logo { font-family:var(--font); font-weight:700; font-size:18px; color:var(--brand-800); letter-spacing:-0.02em; }
+    .po-doc-logo span { display:block; font-weight:400; font-size:11px; color:var(--muted); margin-top:2px; }
+    .po-doc-meta { text-align:right; font-size:12px; color:var(--muted); line-height:1.6; }
+    .po-doc-contact { font-size:12px; color:var(--muted); margin-bottom:10px; }
+    .po-doc-foot { display:flex; justify-content:flex-end; gap:24px; margin-top:10px; font-size:13px; }
 
     @media print {
-      .app-nav, .po-controls, .toolbar, .no-print { display:none !important; }
-      .po-doc-head { display:block; margin-bottom:16px; }
+      .app-nav, .po-controls, .steps, .toolbar, #missingBanner, .no-print { display:none !important; }
       body { background:#fff; }
-      .app-shell { max-width:100%; }
+      .app-shell { max-width:100%; padding:0; }
+      .card { box-shadow:none; border:none; padding:0; margin-bottom:24px; }
+      .po-doc { page-break-after: always; }
       .po-table select { border:none; -webkit-appearance:none; appearance:none; background:none; padding:0; }
       .po-table input.qty { border:none; padding:0; }
     }
@@ -43,39 +39,28 @@
 </head>
 <body>
   <div class="app-shell">
-    <nav class="app-nav">
-      <div class="brand">Eterno <span>Orden de compra</span></div>
-      <div class="nav-links">
-        <a href="index.html">Inicio</a>
-        <a href="quotation_tracker.html">Cotizaciones</a>
-        <a href="supplier_cost_comparison_dashboard.html">Comparador</a>
-        <a href="formula_final.html">Fórmula</a>
-        <a href="purchase-order.html" class="active">Compra</a>
-      </div>
-    </nav>
-
-    <!-- Cabecera visible solo al imprimir -->
-    <div class="po-doc-head">
-      <h1 style="margin:0">Orden de compra — Eterno</h1>
-      <p id="docMeta" style="margin:4px 0 0;font-size:13px;color:#555"></p>
-    </div>
+    <div id="nav-mount"></div>
 
     <header class="page-header no-print">
       <div>
         <h1 class="page-title">Orden de compra</h1>
-        <p class="page-sub">Compara todos los proveedores cotizados, define cantidades a tu criterio y genera la orden. Guardado automático en este navegador.</p>
+        <p class="page-sub">Revisa los picks, ajusta margen/MOQ y genera una orden formal por proveedor.</p>
       </div>
       <div class="toolbar">
         <button type="button" class="btn" id="btnAutoCheapest">↻ Elegir más barato</button>
-        <button type="button" class="btn" id="btnPrint">Imprimir / PDF</button>
+        <button type="button" class="btn" id="btnPrintAll">Imprimir todo</button>
         <button type="button" class="btn" id="btnExportCsv">CSV</button>
-        <button type="button" class="btn" id="btnExportJson">JSON</button>
         <button type="button" class="btn btn-primary" id="btnSave">Guardar orden</button>
       </div>
     </header>
 
-    <!-- Banner de faltantes -->
-    <div id="missingBanner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px"></div>
+    <div class="steps no-print">
+      <div class="step active"><div class="step-num">1</div><div><div class="step-title">Revisar picks</div><div class="step-sub">Proveedor y precio por ingrediente</div></div></div>
+      <div class="step active"><div class="step-num">2</div><div><div class="step-title">Ajustar margen / MOQ</div><div class="step-sub">Lote, seguridad, tasa COP</div></div></div>
+      <div class="step active"><div class="step-num">3</div><div><div class="step-title">Orden por proveedor</div><div class="step-sub">Documento listo para imprimir</div></div></div>
+    </div>
+
+    <div id="missingBanner"></div>
 
     <div class="po-controls no-print">
       <div class="control-group">
@@ -105,9 +90,10 @@
 
     <div class="metrics" id="poMetrics"></div>
 
-    <div class="card po-table" style="margin-top:16px">
+    <h3 class="no-print" style="font-size:14px;margin:20px 0 8px">1 · 2 — Líneas y proveedor seleccionado</h3>
+    <div class="card po-table" style="margin-top:0">
       <div class="table-wrap">
-        <table>
+        <table class="responsive">
           <thead>
             <tr>
               <th>Ingrediente</th>
@@ -135,11 +121,8 @@
       <p class="note" id="poNote"></p>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h4 style="font-size:14px;margin-bottom:8px;font-weight:600">Resumen por proveedor</h4>
-      <p class="note" style="margin-top:0">Cuánto va a cada proveedor según tus selecciones — útil para enviar una orden separada a cada uno.</p>
-      <div class="prov-summary" id="provSummary"></div>
-    </div>
+    <h3 class="no-print" style="font-size:14px;margin:20px 0 8px">3 — Orden de compra por proveedor</h3>
+    <div id="provDocs"></div>
 
     <div class="card no-print" style="margin-top:16px">
       <h4 style="font-size:14px;margin-bottom:8px;font-weight:600">Órdenes guardadas</h4>
@@ -147,7 +130,8 @@
     </div>
   </div>
 
-  <script src="eterno-store.js"></script>
+  <script src="./eterno-store.js"></script>
+  <script src="./eterno-nav.js"></script>
   <script>
     if (!window.EternoStore) {
       document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif">No se encontró <code>eterno-store.js</code>. Verifica la ruta.</div>';
@@ -158,6 +142,7 @@
     if (!db.purchaseOrders) db.purchaseOrders = [];
     if (!db.poDraft) db.poDraft = { batchSizeG: EternoStore.DEFAULT_BATCH_G, lines: {} };
 
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
     const fmt = (n, d = 2) => Number(n || 0).toFixed(d);
     const usd = (n) => '$' + fmt(n, 2);
 
@@ -166,14 +151,19 @@
     function getMlUnit()    { return Number(document.getElementById('mlUnit').value) || 30; }
     function getCopRate()   { return Number(document.getElementById('copRate').value) || db.settings.fxRate || EternoStore.DEFAULT_FX_RATE; }
 
+    // Cotizaciones usables primero (no vencidas), luego vencidas al final — nunca se excluyen del todo:
+    // un pick manual sobre una vencida sigue siendo posible, solo se advierte.
     function quotesFor(ingId, onlyCompat) {
-      return db.quotations
+      const list = db.quotations
         .filter(q => q.ingId === ingId &&
                      q.status !== 'obsoleto — fuera de fórmula' &&
                      (onlyCompat ? q.compat !== 'no' : true))
         .sort((a, b) =>
           EternoStore.landedPrice(a.price, a.provider, db.settings) -
           EternoStore.landedPrice(b.price, b.provider, db.settings));
+      const usable = list.filter(q => !EternoStore.isExpired(q));
+      const expired = list.filter(q => EternoStore.isExpired(q));
+      return usable.concat(expired);
     }
 
     function requiredKg(ing) {
@@ -205,15 +195,14 @@
       EternoStore.saveDb(db);
     }
 
-    // Banner de faltantes
     function renderMissingBanner() {
       const missing = EternoStore.getMissingIngredients(db);
       const el = document.getElementById('missingBanner');
-      if (!missing.length) { el.style.display = 'none'; return; }
-      el.style.display = 'block';
-      el.innerHTML = '<strong>⚠ Ingredientes SIN cotización compatible — no se pueden incluir en el pedido:</strong> ' +
-        missing.map(i => `<span style="background:#ffc107;padding:2px 7px;border-radius:4px;margin:2px;font-weight:600">${i.name}</span>`).join(' ') +
-        ' <a href="quotation_tracker.html" style="margin-left:8px">→ Agregar cotizaciones</a>';
+      if (!missing.length) { el.innerHTML = ''; return; }
+      el.innerHTML = `<div class="banner banner-warn">
+        <div><div class="banner-title">⚠ Ingredientes sin cotización compatible — no se pueden incluir en el pedido</div>
+        ${missing.map(i => `<a class="badge b-warn" style="margin:2px" href="quotation_tracker.html?add=${encodeURIComponent(i.id)}">${esc(i.name)}</a>`).join(' ')}</div>
+      </div>`;
     }
 
     function render() {
@@ -233,7 +222,8 @@
         const opts = st.quotes.length
           ? st.quotes.map(q => {
               const lp = EternoStore.landedPrice(q.price, q.provider, db.settings);
-              return `<option value="${q.id}" ${q.id === st.qid ? 'selected' : ''}>${q.provider} — ${usd(q.price)}/kg (${usd(lp)} landed) · MOQ ${q.moq} · ${q.incoterm || 'EXW'}</option>`;
+              const expiredTag = EternoStore.isExpired(q) ? ' ⚠ VENCIDA' : '';
+              return `<option value="${q.id}" ${q.id === st.qid ? 'selected' : ''}>${esc(q.provider)} — ${usd(q.price)}/kg (${usd(lp)} landed) · MOQ ${q.moq} · ${q.incoterm || 'EXW'}${expiredTag}</option>`;
             }).join('')
           : '';
 
@@ -245,12 +235,14 @@
           const key = st.quote.provider;
           if (!byProvider[key]) byProvider[key] = { total: 0, lines: [], ingIds: [] };
           byProvider[key].total += sub;
-          byProvider[key].lines.push({ ing, qty: st.qty, price: st.quote.price, sub, moq: st.quote.moq });
+          byProvider[key].lines.push({ ing, qty: st.qty, price: st.quote.price, sub, moq: st.quote.moq, leadTimeDays: st.quote.leadTimeDays });
           byProvider[key].ingIds.push(ing.id);
         }
 
         const moqWarn = st.quote && st.qty < (st.quote.moq || 0)
           ? '<span class="moq-warn">⚠ &lt; MOQ</span>' : '';
+        const expiredWarn = st.quote && EternoStore.isExpired(st.quote)
+          ? '<span class="moq-warn">⚠ Cotización vencida</span>' : '';
         const safetyNote = getSafetyPct() > 0
           ? `<span class="req-pill">${fmt(st.req * 1000, 1)} g req · +${getSafetyPct()}% = ${fmt(st.reqSafe * 1000, 1)} g</span>` : '';
 
@@ -258,16 +250,16 @@
           ? `<select data-ing="${ing.id}" class="sel-prov">${opts}</select>`
           : '<span class="no-quote">Sin cotización compatible</span>';
 
-        const phaseTag = ing.phase ? `<span style="font-size:10px;background:#e8f5e9;border-radius:3px;padding:1px 4px;margin-right:4px">Fase ${ing.phase}</span>` : '';
+        const phaseTag = ing.phase ? `<span style="font-size:10px;background:var(--brand-100);border-radius:3px;padding:1px 4px;margin-right:4px">Fase ${ing.phase}</span>` : '';
 
         return `<tr>
-          <td>${phaseTag}<strong>${ing.name}</strong><span class="req-pill">${ing.inci}</span></td>
-          <td class="td-num">${ing.pct}%<span class="req-pill">${fmt(gReq, 2)} g</span>${safetyNote}</td>
-          <td>${provCell}</td>
-          <td class="td-num">${st.quote ? usd(st.quote.price) : '—'}</td>
-          <td class="td-num">${st.quote ? st.quote.moq + ' kg' : '—'} ${moqWarn}</td>
-          <td class="td-num">${st.quote ? `<input type="number" class="qty" data-ing="${ing.id}" min="0" step="0.001" value="${st.qty}">` : '—'}</td>
-          <td class="td-num">${st.quote ? usd(sub) : '—'}</td>
+          <td data-label="Ingrediente">${phaseTag}<strong>${esc(ing.name)}</strong><span class="req-pill">${esc(ing.inci)}</span></td>
+          <td data-label="% / Req." class="td-num">${ing.pct}%<span class="req-pill">${fmt(gReq, 2)} g</span>${safetyNote}</td>
+          <td data-label="Proveedor">${provCell}</td>
+          <td data-label="USD/kg" class="td-num">${st.quote ? usd(st.quote.price) : '—'}</td>
+          <td data-label="MOQ" class="td-num">${st.quote ? st.quote.moq + ' kg' : '—'} ${moqWarn}${expiredWarn}</td>
+          <td data-label="Cantidad" class="td-num">${st.quote ? `<input type="number" class="qty" data-ing="${ing.id}" min="0" step="0.001" value="${st.qty}">` : '—'}</td>
+          <td data-label="Subtotal" class="td-num">${st.quote ? usd(sub) : '—'}</td>
         </tr>`;
       }).join('');
 
@@ -284,49 +276,81 @@
         <div class="metric"><div class="metric-label">Costo MP / unidad</div><div class="metric-value">${usd(cogUnit)}</div><div class="metric-sub">solo materia prima</div></div>
       `;
 
-      // Resumen por proveedor con botón Generar PO
-      const ps    = document.getElementById('provSummary');
-      const provs = Object.keys(byProvider);
-      ps.innerHTML = provs.length
-        ? provs.sort((a, b) => byProvider[b].total - byProvider[a].total).map(p => `
-            <div class="prov-chip">
-              <div class="pc-name">${p}</div>
-              <div class="pc-amount">${usd(byProvider[p].total)}</div>
-              <div class="pc-sub">${byProvider[p].lines.length} ítem(s) · ${Math.round(byProvider[p].total * copRate).toLocaleString('es-CO')} COP</div>
-              <button class="btn" style="margin-top:8px;font-size:11px" data-genprov="${p}">Generar PO</button>
-            </div>`).join('')
-        : '<p class="note" style="margin:0">Aún no hay líneas con cotización.</p>';
-
-      // Bindings de "Generar PO por proveedor"
-      ps.querySelectorAll('[data-genprov]').forEach(btn => {
-        btn.onclick = () => generateProviderPO(btn.dataset.genprov, byProvider[btn.dataset.genprov], copRate, batchG);
-      });
+      renderProviderDocs(byProvider, copRate, batchG);
 
       document.getElementById('poNote').textContent = missingCount
         ? `${missingCount} ingrediente(s) sin cotización compatible.`
         : 'Todos los ingredientes tienen al menos una cotización compatible.';
-
-      document.getElementById('docMeta').textContent =
-        `Lote ${batchG} g (${(batchG/1000).toFixed(3)} kg) · ${new Date().toLocaleDateString('es-CO')} · Total ${usd(grand)}`;
     }
 
-    function generateProviderPO(provName, provData, copRate, batchG) {
-      const ref  = 'PO-' + provName.replace(/\s+/g,'').slice(0,8).toUpperCase() + '-' + new Date().toISOString().slice(0,10).replace(/-/g,'');
-      const date = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
-      const rows = provData.lines.map(l =>
-        `| ${l.ing.name} | ${l.ing.inci} | ${fmt(l.qty * 1000, 1)} g | ${l.qty.toFixed(3)} kg | $${fmt(l.price)} USD/kg | $${usd(l.sub)} |`
-      ).join('\n');
-      const text = `ORDEN DE COMPRA — ETERNO\nRef: ${ref}\nFecha: ${date}\nProveedor: ${provName}\nLote objetivo: ${batchG} g\n\n` +
-        `| Ingrediente | INCI | Gramos | kg | USD/kg | Subtotal |\n|---|---|---|---|---|---|\n${rows}\n\n` +
-        `TOTAL: ${usd(provData.total)} USD · ${Math.round(provData.total * copRate).toLocaleString('es-CO')} COP (@${copRate} COP/USD)`;
-      const blob = new Blob([text], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = ref + '.txt';
-      a.click();
-      URL.revokeObjectURL(a.href);
-      EternoStore.toast('PO generado: ' + ref);
+    function renderProviderDocs(byProvider, copRate, batchG) {
+      const provs = Object.keys(byProvider);
+      const el = document.getElementById('provDocs');
+      if (!provs.length) {
+        el.innerHTML = `<div class="card"><div class="empty-state">
+          <div class="empty-title">Aún no hay líneas con cotización</div>
+          <div class="empty-sub">Selecciona proveedores en la tabla de arriba para generar las órdenes.</div>
+        </div></div>`;
+        return;
+      }
+      const date = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+      el.innerHTML = provs.sort((a, b) => byProvider[b].total - byProvider[a].total).map(p => {
+        const data = byProvider[p];
+        const supplier = EternoStore.findSupplierByName(db, p);
+        const maxLead = Math.max(0, ...data.lines.map(l => l.leadTimeDays || 0));
+        const ref = 'OC-' + p.replace(/\s+/g, '').slice(0, 8).toUpperCase() + '-' + new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const contactBits = supplier?.contact
+          ? [supplier.contact.nombre, supplier.contact.email, supplier.contact.telefono].filter(Boolean).join(' · ')
+          : '';
+        const rows = data.lines.map(l => `<tr>
+          <td data-label="Ingrediente">${esc(l.ing.name)}<div class="ghost">${esc(l.ing.inci)}</div></td>
+          <td data-label="Gramos" class="td-num">${fmt(l.qty * 1000, 1)} g</td>
+          <td data-label="kg" class="td-num">${l.qty.toFixed(3)} kg</td>
+          <td data-label="USD/kg" class="td-num">${usd(l.price)}</td>
+          <td data-label="Subtotal" class="td-num">${usd(l.sub)}</td>
+        </tr>`).join('');
+        return `<div class="card po-doc" data-provider="${esc(p)}">
+          <div class="po-doc-head">
+            <div class="po-doc-logo">Eterno Labs<span>Orden de compra</span></div>
+            <div class="po-doc-meta">
+              Ref: <strong>${ref}</strong><br>
+              Fecha: ${date}<br>
+              Lote objetivo: ${batchG} g<br>
+              Lead time máx.: <strong>${maxLead || '—'}${maxLead ? ' días' : ''}</strong>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div><strong style="font-size:15px">${esc(p)}</strong> ${supplier ? `<span class="badge ${supplier.type === 'importado' ? 'b-carrier' : 'b-ao'}" style="margin-left:6px">${supplier.type === 'importado' ? 'Importado' : 'Nacional'}</span>` : ''}</div>
+            <button type="button" class="btn btn-sm no-print" data-print="${esc(p)}">Imprimir esta orden</button>
+          </div>
+          ${contactBits ? `<div class="po-doc-contact">Contacto: ${esc(contactBits)}</div>` : ''}
+          <div class="table-wrap">
+            <table class="responsive">
+              <thead><tr><th>Ingrediente</th><th class="th-num">Gramos</th><th class="th-num">kg</th><th class="th-num">USD/kg</th><th class="th-num">Subtotal</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="po-doc-foot">
+            <div>Subtotal USD: <strong>${usd(data.total)}</strong></div>
+            <div>Subtotal COP: <strong>$${Math.round(data.total * copRate).toLocaleString('es-CO')}</strong></div>
+          </div>
+        </div>`;
+      }).join('');
+
+      el.querySelectorAll('[data-print]').forEach(btn => {
+        btn.onclick = () => printProvider(btn.dataset.print);
+      });
     }
+
+    function printProvider(p) {
+      document.querySelectorAll('.po-doc').forEach(el => {
+        el.style.display = (el.dataset.provider === p) ? '' : 'none';
+      });
+      window.print();
+    }
+    window.onafterprint = () => {
+      document.querySelectorAll('.po-doc').forEach(el => { el.style.display = ''; });
+    };
 
     document.getElementById('poBody').addEventListener('change', (e) => {
       const ingId = e.target.dataset.ing;
@@ -364,7 +388,7 @@
       });
       saveDraft();
       render();
-      EternoStore.toast('Seleccionado el proveedor más barato por ingrediente');
+      EternoStore.toast('Seleccionado el proveedor más barato (no vencido) por ingrediente');
     };
 
     function currentLines() {
@@ -396,17 +420,6 @@
       renderSaved();
     };
 
-    document.getElementById('btnExportJson').onclick = () => {
-      const lines = currentLines();
-      const total = lines.reduce((s, l) => s + (l.subtotal || 0), 0);
-      const blob = new Blob([JSON.stringify({ date: new Date().toISOString(), batchG: getBatchG(), total, lines }, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'eterno_orden_' + new Date().toISOString().slice(0, 10) + '.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    };
-
     document.getElementById('btnExportCsv').onclick = () => {
       const lines = currentLines().filter(l => l.provider);
       const total = lines.reduce((s, l) => s + l.subtotal, 0);
@@ -421,19 +434,22 @@
       URL.revokeObjectURL(a.href);
     };
 
-    document.getElementById('btnPrint').onclick = () => window.print();
+    document.getElementById('btnPrintAll').onclick = () => window.print();
 
     function renderSaved() {
       const el = document.getElementById('savedList');
       if (!db.purchaseOrders.length) { el.innerHTML = '<p class="note" style="margin:0">No hay órdenes guardadas.</p>'; return; }
-      el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref.</th><th>Fecha</th><th class="th-num">Lote</th><th class="th-num">Total USD</th><th></th></tr></thead><tbody>' +
+      el.innerHTML = '<div class="table-wrap"><table class="responsive"><thead><tr><th>Ref.</th><th>Fecha</th><th class="th-num">Lote</th><th class="th-num">Total USD</th><th></th></tr></thead><tbody>' +
         db.purchaseOrders.map(o =>
-          `<tr><td><strong>${o.ref}</strong></td><td>${o.date}</td><td style="text-align:right">${o.batchG ? o.batchG + ' g' : (o.batchKg || '?') + ' kg'}</td><td style="text-align:right">${usd(o.total)}</td><td style="text-align:right"><button class="btn" data-del="${o.id}">Eliminar</button></td></tr>`
+          `<tr><td data-label="Ref.">${esc(o.ref)}</td><td data-label="Fecha">${esc(o.date)}</td><td data-label="Lote" class="td-num">${o.batchG ? o.batchG + ' g' : (o.batchKg || '?') + ' kg'}</td><td data-label="Total" class="td-num">${usd(o.total)}</td><td data-label="Acción" style="text-align:right"><button class="btn btn-sm" data-del="${o.id}">Eliminar</button></td></tr>`
         ).join('') + '</tbody></table></div>';
-      el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+      el.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+        const ok = await EternoStore.confirmDialog({ title: 'Eliminar orden', message: '¿Eliminar esta orden guardada?', okLabel: 'Eliminar', danger: true });
+        if (!ok) return;
         db.purchaseOrders = db.purchaseOrders.filter(o => o.id !== b.dataset.del);
         EternoStore.saveDb(db);
         renderSaved();
+        EternoStore.toast('Orden eliminada');
       });
     }
 

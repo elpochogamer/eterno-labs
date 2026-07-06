@@ -1,13 +1,17 @@
 /**
- * Eterno — capa de persistencia local (localStorage) v2
+ * Eterno — capa de persistencia local (localStorage) v3
  * Fórmula 13 ingredientes · FX 3650 COP/USD · moneda normalizada
+ * Directorio de proveedores, vencimientos, lead time, COA, respaldo.
  */
 (function (global) {
   'use strict';
   const DB_KEY         = 'eterno_database_v1';
-  const SCHEMA         = 2;
+  const SCHEMA         = 3;
   const DEFAULT_BATCH_G = 445;
   const DEFAULT_FX_RATE = 3650;
+  const CURRENCIES      = ['COP', 'USD'];
+  const UNITS           = ['g', 'kg', 'ml', 'l', 'unidad'];
+  const BACKUP_REMINDER_DAYS = 7;
 
   // ── Fórmula definitiva 13 ingredientes — lote base 445 g ────────────────
   const FORMULA_INGREDIENTS = [
@@ -182,19 +186,114 @@
     return Math.round(pct / 100 * (batchSizeG || DEFAULT_BATCH_G) * 1000) / 1000;
   }
 
+  // ── Directorio de proveedores ────────────────────────────────────────────
+  function slugify(name) {
+    return String(name || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'proveedor';
+  }
+
+  function createSupplier(name, db) {
+    const base = slugify(name);
+    const existingIds = new Set((db && db.suppliers || []).map(s => s.id));
+    let id = 'sup-' + base;
+    let n = 2;
+    while (existingIds.has(id)) { id = 'sup-' + base + '-' + n; n++; }
+    return {
+      id,
+      name: (name || '').trim() || 'Proveedor sin nombre',
+      country: isChineseSupplier(name) ? 'China' : null,
+      type: isChineseSupplier(name) ? 'importado' : 'nacional',
+      contact: { nombre: null, email: null, telefono: null },
+      notes: '',
+    };
+  }
+
+  function findSupplierByName(db, name) {
+    const n = (name || '').trim().toLowerCase();
+    if (!n) return null;
+    return (db.suppliers || []).find(s => (s.name || '').trim().toLowerCase() === n) || null;
+  }
+
+  function matchOrCreateSupplier(db, name) {
+    if (!db.suppliers) db.suppliers = [];
+    let s = findSupplierByName(db, name);
+    if (!s) {
+      s = createSupplier(name, db);
+      db.suppliers.push(s);
+    }
+    return s;
+  }
+
+  function getSuppliers(db) {
+    return db.suppliers || [];
+  }
+
+  function addSupplier(db, data) {
+    if (!data || !String(data.name || '').trim()) {
+      return { ok: false, error: 'El nombre del proveedor es obligatorio.' };
+    }
+    if (findSupplierByName(db, data.name)) {
+      return { ok: false, error: 'Ya existe un proveedor con ese nombre.' };
+    }
+    const s = createSupplier(data.name, db);
+    s.country = data.country || s.country;
+    s.type = data.type === 'nacional' || data.type === 'importado' ? data.type : s.type;
+    s.contact = { nombre: data.contact?.nombre || null, email: data.contact?.email || null, telefono: data.contact?.telefono || null };
+    s.notes = data.notes || '';
+    if (!db.suppliers) db.suppliers = [];
+    db.suppliers.push(s);
+    saveDb(db);
+    return { ok: true, supplier: s };
+  }
+
+  function updateSupplier(db, id, patch) {
+    const s = (db.suppliers || []).find(x => x.id === id);
+    if (!s) return { ok: false, error: 'Proveedor no encontrado.' };
+    Object.assign(s, patch, { contact: { ...s.contact, ...(patch.contact || {}) } });
+    saveDb(db);
+    return { ok: true, supplier: s };
+  }
+
+  // ── Vencimiento ──────────────────────────────────────────────────────────
+  function isExpired(q) {
+    if (!q || !q.validUntil) return false;
+    const d = new Date(q.validUntil);
+    if (isNaN(d.getTime())) return false;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return d.getTime() < today.getTime();
+  }
+
+  function isUsable(q) {
+    return q.compat !== 'no' &&
+           q.status !== 'obsoleto — fuera de fórmula' &&
+           q.status !== 'descartado' &&
+           !isExpired(q);
+  }
+
+  function quotationStateBadge(q) {
+    if (q.status === 'obsoleto — fuera de fórmula') return { cls: 'b-obsoleto', label: 'Obsoleto' };
+    if (isExpired(q)) return { cls: 'b-vencido', label: 'Vencido' };
+    if (q.compat === 'no') return { cls: 'b-incompatible', label: 'Incompatible' };
+    if (q.compat === 'yes') return { cls: 'b-compatible', label: 'Compatible' };
+    return { cls: 'b-pend', label: 'Pendiente' };
+  }
+
   // ── defaultDb ────────────────────────────────────────────────────────────
   function defaultDb() {
     const now = new Date().toISOString();
     const fxRate = DEFAULT_FX_RATE;
-    return {
+    const db = {
       version: SCHEMA,
       meta: { formulaName: 'Aceite Capilar — Definitiva v2', updatedAt: now, createdAt: now },
       formula: FORMULA_INGREDIENTS.map(i => ({ ...i })),
       quotations: DEFAULT_QUOTATIONS.map((q, idx) => {
         const nq = { id: q.id || 'seed-' + (idx + 1), ...q,
+          unit: 'kg', leadTimeDays: null, validUntil: null, coaUrl: null, coaNota: null,
           date: new Date().toLocaleDateString('es-CO') };
         return normalizeQuotation(nq, fxRate);
       }),
+      suppliers: [],
       settings: {
         fxRate,
         copRate: fxRate,
@@ -207,11 +306,14 @@
         importMarkupPct: 30,
         supplierP1: 'P1 China',
         supplierP2: 'P2 Imagen',
+        lastBackupAt: null,
       },
       picks: { ...DEFAULT_PICKS },
       purchaseOrders: [],
       poDraft: { batchSizeG: DEFAULT_BATCH_G, lines: {} },
     };
+    db.quotations.forEach(q => { q.supplierId = matchOrCreateSupplier(db, q.provider).id; });
+    return db;
   }
 
   // ── migrate ──────────────────────────────────────────────────────────────
@@ -229,6 +331,7 @@
       db.settings.copRate = DEFAULT_FX_RATE;
     }
     db.settings.copRate = db.settings.fxRate;
+    if (db.settings.lastBackupAt === undefined) db.settings.lastBackupAt = null;
 
     db.manualPrices   = db.manualPrices || {};
     db.purchaseOrders = Array.isArray(db.purchaseOrders) ? db.purchaseOrders : [];
@@ -253,9 +356,16 @@
       db.quotations = db.quotations.map(q => {
         const nq = {
           compat:'pending', spec:'pending', status:'cotizado', moq:1, incoterm:'EXW',
+          unit: 'kg', leadTimeDays: null, validUntil: null, coaUrl: null, coaNota: null,
           ...q,
           ingId: q.ingId || nameToId(q.ingName) || q.ingName,
         };
+        // Preserve explicit nulls/values already present (spread above keeps them if defined)
+        if (nq.unit === undefined) nq.unit = 'kg';
+        if (nq.leadTimeDays === undefined) nq.leadTimeDays = null;
+        if (nq.validUntil === undefined) nq.validUntil = null;
+        if (nq.coaUrl === undefined) nq.coaUrl = null;
+        if (nq.coaNota === undefined) nq.coaNota = null;
         normalizeQuotation(nq, fxRate);
         // Mark obsolete ingredients
         if (OBSOLETE_IDS.has(nq.ingId) &&
@@ -276,6 +386,17 @@
         });
       }
     }
+
+    // Suppliers directory: build/merge from provider names (idempotent, matching por nombre exacto)
+    db.suppliers = Array.isArray(db.suppliers) ? db.suppliers : [];
+    db.quotations.forEach(q => {
+      let s = q.supplierId ? db.suppliers.find(x => x.id === q.supplierId) : null;
+      if (!s) s = findSupplierByName(db, q.provider);
+      if (!s) s = matchOrCreateSupplier(db, q.provider);
+      q.supplierId = s.id;
+      // keep provider name in sync with directory display name
+      q.provider = s.name;
+    });
 
     // Picks: migrate hybrid → picks, remove obsolete, add new ingredients
     const oldHybrid = db.hybrid || {};
@@ -348,15 +469,16 @@
            FORMULA_INGREDIENTS.find(i => i.name === idOrName);
   }
 
-  // Precios por proveedor (solo compatibles, excluye obsoletos, solo ing de fórmula activa)
+  function getFormula(db) {
+    return db.formula;
+  }
+
+  // Precios por proveedor (solo compatibles, no vencidos, excluye obsoletos, solo ing de fórmula activa)
   function getPricesFromQuotations(db) {
     const formulaIds = new Set(db.formula.map(i => i.id));
     const result = {};
     db.quotations
-      .filter(q => q.compat !== 'no' &&
-                   q.status !== 'obsoleto — fuera de fórmula' &&
-                   q.status !== 'descartado' &&
-                   q.ingId && formulaIds.has(q.ingId))
+      .filter(q => isUsable(q) && q.ingId && formulaIds.has(q.ingId))
       .forEach(q => {
         if (!result[q.provider]) result[q.provider] = {};
         if (result[q.provider][q.ingId] == null || q.price < result[q.provider][q.ingId]) {
@@ -374,13 +496,109 @@
     return db.formula.filter(ing => !covered.has(ing.id));
   }
 
+  function getQuotations(db, opts) {
+    opts = opts || {};
+    let list = db.quotations.slice();
+    if (opts.soloCompatibles) list = list.filter(isUsable);
+    if (opts.ingId) list = list.filter(q => q.ingId === opts.ingId);
+    return list;
+  }
+
+  function getPicks(db) {
+    return db.picks || {};
+  }
+
   function savePick(db, ingId, providerName) {
     if (!db.picks) db.picks = {};
     db.picks[ingId] = providerName;
     saveDb(db);
   }
 
-  // ── Exportar / importar ──────────────────────────────────────────────────
+  function getSettings(db) {
+    return db.settings;
+  }
+
+  function updateSettings(db, patch) {
+    db.settings = { ...db.settings, ...patch };
+    saveDb(db);
+    return db.settings;
+  }
+
+  // ── Validación de cotizaciones ───────────────────────────────────────────
+  function validateQuotationInput(data, db) {
+    if (!data) return 'Datos de cotización faltantes.';
+    if (!data.ingId || !db.formula.find(i => i.id === data.ingId)) {
+      return 'Selecciona un ingrediente válido de la fórmula.';
+    }
+    if (!(Number(data.price) > 0)) {
+      return 'El precio debe ser mayor que 0.';
+    }
+    if (!CURRENCIES.includes(data.currency)) {
+      return 'La moneda debe ser COP o USD.';
+    }
+    if (data.unit && !UNITS.includes(data.unit)) {
+      return 'La unidad de presentación debe ser g, kg, ml, l o unidad.';
+    }
+    if (!data.provider || !String(data.provider).trim()) {
+      return 'El proveedor es obligatorio.';
+    }
+    return null;
+  }
+
+  function buildQuotationRecord(data, db, existing) {
+    const supplier = matchOrCreateSupplier(db, String(data.provider).trim());
+    const q = {
+      id: existing?.id || data.id || 'q-' + Date.now(),
+      ingId: data.ingId,
+      provider: supplier.name,
+      supplierId: supplier.id,
+      price: Number(data.price),
+      currency: data.currency,
+      unit: data.unit || 'kg',
+      moq: data.moq != null && data.moq !== '' ? Number(data.moq) : 1,
+      incoterm: data.incoterm || 'EXW',
+      spec: data.spec || 'pending',
+      status: data.status || 'cotizado',
+      compat: data.compat || 'pending',
+      notes: data.notes || '',
+      leadTimeDays: data.leadTimeDays != null && data.leadTimeDays !== '' ? Number(data.leadTimeDays) : null,
+      validUntil: data.validUntil || null,
+      coaUrl: data.coaUrl || null,
+      coaNota: data.coaNota || null,
+      date: existing?.date || data.date || new Date().toLocaleDateString('es-CO'),
+    };
+    normalizeQuotation(q, db.settings.fxRate);
+    return q;
+  }
+
+  function addQuotation(db, data) {
+    const err = validateQuotationInput(data, db);
+    if (err) return { ok: false, error: err };
+    const q = buildQuotationRecord(data, db, null);
+    db.quotations.push(q);
+    saveDb(db);
+    return { ok: true, quotation: q };
+  }
+
+  function updateQuotation(db, id, patch) {
+    const idx = db.quotations.findIndex(q => q.id === id);
+    if (idx < 0) return { ok: false, error: 'Cotización no encontrada.' };
+    const existing = db.quotations[idx];
+    const merged = { ...existing, priceOriginal: undefined, currencyOriginal: undefined, fxRateUsed: undefined, _normalized: undefined, ...patch };
+    const err = validateQuotationInput(merged, db);
+    if (err) return { ok: false, error: err };
+    const q = buildQuotationRecord(merged, db, existing);
+    db.quotations[idx] = q;
+    saveDb(db);
+    return { ok: true, quotation: q };
+  }
+
+  function deleteQuotation(db, id) {
+    db.quotations = db.quotations.filter(q => q.id !== id);
+    saveDb(db);
+  }
+
+  // ── Exportar / importar / respaldo ──────────────────────────────────────
   function exportJson(db, filename) {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -388,6 +606,42 @@
     a.download = filename || 'eterno_database_' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function exportBackup(db) {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    db.settings.lastBackupAt = new Date().toISOString();
+    saveDb(db);
+    exportJson(db, 'eterno_backup_' + dateStr + '.json');
+  }
+
+  function shouldShowBackupReminder(db) {
+    const last = db.settings && db.settings.lastBackupAt;
+    if (!last) return true;
+    const days = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
+    return days > BACKUP_REMINDER_DAYS;
+  }
+
+  function summarizeBackup(raw) {
+    let obj;
+    try { obj = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { return null; }
+    if (!obj || typeof obj !== 'object') return null;
+    return {
+      quotations: Array.isArray(obj.quotations) ? obj.quotations.length : 0,
+      picks: obj.picks ? Object.keys(obj.picks).length : 0,
+      suppliers: Array.isArray(obj.suppliers) ? obj.suppliers.length : 0,
+      date: obj.meta?.updatedAt || null,
+      version: obj.version || 1,
+    };
+  }
+
+  function readFileText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
   }
 
   function importJsonFile(file, merge) {
@@ -400,6 +654,8 @@
           if (merge) {
             const ids = new Set(db.quotations.map(q => q.id));
             incoming.quotations.forEach(q => { if (!ids.has(q.id)) db.quotations.push(q); });
+            const supIds = new Set(db.suppliers.map(s => s.id));
+            (incoming.suppliers || []).forEach(s => { if (!supIds.has(s.id)) db.suppliers.push(s); });
             db.settings     = { ...db.settings, ...incoming.settings };
             db.picks        = { ...db.picks, ...incoming.picks };
             db.manualPrices = { ...db.manualPrices, ...incoming.manualPrices };
@@ -430,18 +686,45 @@
     el._t = setTimeout(() => el.classList.remove('show'), ms || 2500);
   }
 
+  // ── Confirmación (reemplaza confirm() nativo) ───────────────────────────
+  function confirmDialog(opts) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay open';
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:420px">
+          <h3>${opts.title || 'Confirmar'}</h3>
+          <p style="font-size:13px;color:var(--muted);line-height:1.6;white-space:pre-line">${opts.message || ''}</p>
+          <div class="modal-actions">
+            <button type="button" class="btn" data-act="cancel">${opts.cancelLabel || 'Cancelar'}</button>
+            <button type="button" class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}" data-act="ok">${opts.okLabel || 'Confirmar'}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) { overlay.remove(); resolve(false); }
+      });
+      overlay.querySelector('[data-act="cancel"]').onclick = () => { overlay.remove(); resolve(false); };
+      overlay.querySelector('[data-act="ok"]').onclick = () => { overlay.remove(); resolve(true); };
+    });
+  }
+
   // ── API pública ──────────────────────────────────────────────────────────
   global.EternoStore = {
     DB_KEY, SCHEMA, FORMULA_INGREDIENTS, OBSOLETE_IDS, DEFAULT_PICKS,
-    DEFAULT_FX_RATE, DEFAULT_BATCH_G,
+    DEFAULT_FX_RATE, DEFAULT_BATCH_G, CURRENCIES, UNITS, BACKUP_REMINDER_DAYS,
     loadDb, saveDb, defaultDb, migrate,
-    sumPct, pctFactor, nameToId, getIngredient,
-    getPricesFromQuotations, getMissingIngredients,
-    savePick,
+    sumPct, pctFactor, nameToId, getIngredient, getFormula,
+    getPricesFromQuotations, getMissingIngredients, getQuotations,
+    getPicks, savePick, setPick: savePick,
+    getSettings, updateSettings,
+    addQuotation, updateQuotation, deleteQuotation, validateQuotationInput,
+    getSuppliers, addSupplier, updateSupplier, matchOrCreateSupplier, findSupplierByName,
+    isExpired, isUsable, quotationStateBadge,
     isChineseSupplier, importMarkupFactor, landedPrice, gramsForBatch,
     normalizeQuotation, detectCurrency,
-    exportJson, importJsonFile,
-    toast,
+    exportJson, exportBackup, shouldShowBackupReminder, summarizeBackup, readFileText, importJsonFile,
+    toast, confirmDialog,
     // Compat aliases
     providerBucket: () => 'local',
     detectBucket:   () => 'local',

@@ -1,36 +1,29 @@
-# Eterno — Sistema de Formulación Capilar
+# Eterno Labs — Sistema de Formulación Capilar
 
-Base de datos de cotizaciones, análisis de costos y evaluación científica de fórmula cosmética capilar.
+App local vanilla (sin frameworks, sin build) para cotizaciones de proveedores, análisis de costos y orden de compra de una fórmula cosmética capilar de 13 ingredientes.
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura del proyecto (plana, sin subcarpetas para la app)
 
-- **src/components/ui/** - Componentes UI reutilizables
-- **src/lib/** - Lógica y utilidades
-- **src/pages/** - Páginas HTML principales
-- **data/** - Base de datos JSON
-- **docs/** - Documentación científica
+- **eterno-store.js** — capa de persistencia (localStorage, clave `eterno_database_v1`, schema v3). Toda lectura/escritura de datos pasa por `window.EternoStore`.
+- **eterno-ui.css** — design system compartido (variables, `.btn`, `.badge`, `.table`, `.banner`, `.modal`, `.toast`, tablas responsive).
+- **eterno-nav.js** — inyecta el header común (logo, links, exportar/importar respaldo, indicador de estado del pedido) en las 5 páginas.
+- **index.html / quotation_tracker.html / supplier_cost_comparison_dashboard.html / formula_final.html / purchase-order.html** — las 5 páginas de la app.
+- **data/** — backups JSON de ejemplo.
+- **docs/** — documentación científica de la fórmula.
 
-## 🚀 Cómo Empezar
+## 🚀 Cómo empezar
 
-### Con Node.js:
-```.
-npm install
-npm run dev
-```
+No requiere Node ni build. Abre `index.html` directamente en el navegador.
 
-### Sin Node.js:
-Abre directamente: `src/pages/index.html`
+## 📊 Módulos principales
 
-## 📊 Módulos Principales
+- **Inicio** → index.html — estado del pedido, faltantes, costo del lote, últimas cotizaciones.
+- **Cotizaciones** → quotation_tracker.html — filtros, orden por columna, alta/edición con lead time/vencimiento/COA.
+- **Comparador de costos** → supplier_cost_comparison_dashboard.html — vista por ingrediente, matriz de proveedores, importación, riesgos.
+- **Fórmula final** → formula_final.html — tabla data-driven con lote editable y costo en vivo.
+- **Orden de compra** → purchase-order.html — picks → margen/MOQ → PO imprimible por proveedor.
 
-- **Inicio** → index.html
-- **Cotizaciones** → quotation_tracker.html
-- **Comparador de Costos** → supplier_cost_comparison_dashboard.html
-- **Fórmula Final** → formula_final.html
-- **Orden de Compra** → purchase-order.html
+## 💾 Datos y respaldo
 
-## 💾 Datos
-
-La base de datos se guarda en localStorage del navegador.
-Backup disponible en `data/eterno_database_2026-06-03.json`
+Los datos viven solo en el `localStorage` de tu navegador. Usa el botón "Exportar respaldo" del header (presente en las 5 páginas) con frecuencia — la app te avisa si pasan más de 7 días sin exportar. "Importar respaldo" fusiona un JSON exportado (soporta backups de versiones anteriores, se migran automáticamente).
 
