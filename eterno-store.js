@@ -366,7 +366,6 @@
     db.settings.copRate = db.settings.fxRate;
     if (db.settings.lastBackupAt === undefined) db.settings.lastBackupAt = null;
 
-    db.manualPrices   = db.manualPrices || {};
     db.purchaseOrders = Array.isArray(db.purchaseOrders) ? db.purchaseOrders : [];
     db.poDraft        = db.poDraft || { batchSizeG: DEFAULT_BATCH_G, lines: {} };
     if (!db.poDraft.batchSizeG) db.poDraft.batchSizeG = db.poDraft.batchKg ? db.poDraft.batchKg * 1000 : DEFAULT_BATCH_G;
@@ -748,7 +747,6 @@
             (incoming.suppliers || []).forEach(s => { if (!supIds.has(s.id)) db.suppliers.push(s); });
             db.settings     = { ...db.settings, ...incoming.settings };
             db.picks        = { ...db.picks, ...incoming.picks };
-            db.manualPrices = { ...db.manualPrices, ...incoming.manualPrices };
           } else {
             db = incoming;
           }
@@ -824,8 +822,5 @@
     normalizeQuotation, detectCurrency,
     exportJson, exportBackup, shouldShowBackupReminder, summarizeBackup, readFileText, importJsonFile,
     toast, confirmDialog, esc, fmt,
-    // Compat aliases
-    providerBucket: () => 'local',
-    detectBucket:   () => 'local',
   };
 })(typeof window !== 'undefined' ? window : globalThis);
