@@ -265,13 +265,13 @@
       }).join('');
 
       document.getElementById('grandTotal').textContent    = usd(grand);
-      document.getElementById('grandTotalCop').textContent = '$' + Math.round(grand * copRate).toLocaleString('es-CO') + ' COP';
+      document.getElementById('grandTotalCop').textContent = '$' + EternoStore.formatCop(grand, copRate) + ' COP';
 
       const covered   = db.formula.length - missingCount;
       const unitsLote = (batchG * density / 1000) / (mlUnit * density / 1000);
       const cogUnit   = unitsLote > 0 ? grand / unitsLote : 0;
       document.getElementById('poMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">Total orden</div><div class="metric-value">${usd(grand)}</div><div class="metric-sub">${Math.round(grand * copRate).toLocaleString('es-CO')} COP</div></div>
+        <div class="metric"><div class="metric-label">Total orden</div><div class="metric-value">${usd(grand)}</div><div class="metric-sub">${EternoStore.formatCop(grand, copRate)} COP</div></div>
         <div class="metric"><div class="metric-label">Ingredientes cubiertos</div><div class="metric-value">${covered}/${db.formula.length}</div><div class="metric-sub">${missingCount ? missingCount + ' sin cotización' : 'completo'}</div></div>
         <div class="metric"><div class="metric-label">Unidades del lote</div><div class="metric-value">${Math.floor(unitsLote)}</div><div class="metric-sub">${mlUnit} ml · densidad ${density} g/ml</div></div>
         <div class="metric"><div class="metric-label">Costo MP / unidad</div><div class="metric-value">${usd(cogUnit)}</div><div class="metric-sub">solo materia prima</div></div>
@@ -333,7 +333,7 @@
           </div>
           <div class="po-doc-foot">
             <div>Subtotal USD: <strong>${usd(data.total)}</strong></div>
-            <div>Subtotal COP: <strong>$${Math.round(data.total * copRate).toLocaleString('es-CO')}</strong></div>
+            <div>Subtotal COP: <strong>$${EternoStore.formatCop(data.total, copRate)}</strong></div>
           </div>
         </div>`;
       }).join('');

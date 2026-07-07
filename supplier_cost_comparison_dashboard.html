@@ -338,14 +338,14 @@
         }).join('');
 
         const selCell = r.currentPick
-          ? `<strong>${esc(r.currentPick)}</strong><div style="font-size:11px;color:var(--muted)">$${fmt(r.subtotal)} USD<br>${Math.round((r.subtotal || 0) * copRate).toLocaleString('es-CO')} COP</div>`
+          ? `<strong>${esc(r.currentPick)}</strong><div style="font-size:11px;color:var(--muted)">$${fmt(r.subtotal)} USD<br>${EternoStore.formatCop(r.subtotal, copRate)} COP</div>`
           : `<span style="color:var(--muted)">—</span>`;
 
         return `<tr><td><strong>${esc(r.ing.name)}</strong><div style="font-size:11px;color:var(--muted)">${esc(r.ing.inci)}</div><div style="font-size:11px;color:var(--muted)">${ingPct}% fórmula</div></td>${provCells}<td class="td-num">${selCell}</td></tr>`;
       }).join('');
 
       const totalProvCols = providers.map(() => '<td></td>').join('');
-      const totalRow = `<tr style="background:var(--surface2);font-weight:600"><td>TOTAL lote ${loteKg} kg</td>${totalProvCols}<td class="td-num">$${fmt(totalPicks)} USD<br><span style="font-size:11px;font-weight:400;color:var(--muted)">${Math.round(totalPicks * copRate).toLocaleString('es-CO')} COP</span></td></tr>`;
+      const totalRow = `<tr style="background:var(--surface2);font-weight:600"><td>TOTAL lote ${loteKg} kg</td>${totalProvCols}<td class="td-num">$${fmt(totalPicks)} USD<br><span style="font-size:11px;font-weight:400;color:var(--muted)">${EternoStore.formatCop(totalPicks, copRate)} COP</span></td></tr>`;
 
       document.getElementById('picksTableWrap').innerHTML = `<table>${thead}<tbody>${tbodyRows}${totalRow}</tbody></table>`;
 
@@ -375,7 +375,7 @@
         <div class="scenario-card" style="flex:1;min-width:180px">
           <span class="sc-label">${esc(p)}</span>
           <div class="sc-amount">$${fmt(byProv[p].total)}</div>
-          <div class="sc-sub">${byProv[p].lines} ingrediente(s) · ${Math.round(byProv[p].total * copRate).toLocaleString('es-CO')} COP</div>
+          <div class="sc-sub">${byProv[p].lines} ingrediente(s) · ${EternoStore.formatCop(byProv[p].total, copRate)} COP</div>
         </div>`).join('');
       document.getElementById('providerCards').innerHTML = `
         <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px">RESUMEN POR PROVEEDOR</h4>
@@ -383,7 +383,7 @@
           <div class="scenario-card winner" style="flex:1;min-width:180px">
             <span class="sc-badge">Total</span><span class="sc-label">Todas las órdenes</span>
             <div class="sc-amount">$${fmt(grandTotal)}</div>
-            <div class="sc-sub">${Math.round(grandTotal * copRate).toLocaleString('es-CO')} COP</div>
+            <div class="sc-sub">${EternoStore.formatCop(grandTotal, copRate)} COP</div>
           </div>
         </div>`;
     }

@@ -772,6 +772,9 @@
   function fmt(n, d = 2) {
     return Number(n || 0).toFixed(d);
   }
+  function formatCop(usdAmount, copRate) {
+    return Math.round((usdAmount || 0) * (copRate || 0)).toLocaleString('es-CO');
+  }
 
   // ── Toast ────────────────────────────────────────────────────────────────
   function toast(msg, ms) {
@@ -827,6 +830,6 @@
     isChineseSupplier, importMarkupFactor, landedPrice, gramsForBatch,
     normalizeQuotation, detectCurrency,
     exportJson, exportBackup, shouldShowBackupReminder, summarizeBackup, readFileText, importJsonFile,
-    toast, confirmDialog, esc, fmt,
+    toast, confirmDialog, esc, fmt, formatCop,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
