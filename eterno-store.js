@@ -521,8 +521,9 @@
         return db;
       }
       const db = JSON.parse(raw);
+      const originalVersion = db.version;
       const migrated = migrate(db);
-      if (!db.version || db.version < SCHEMA) saveDb(migrated);
+      if (!originalVersion || originalVersion < SCHEMA) saveDb(migrated);
       return migrated;
     } catch (e) {
       console.warn('Eterno DB load error', e);
