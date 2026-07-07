@@ -131,15 +131,20 @@
         <h4 style="font-size:15px;margin-bottom:8px;font-weight:600">Costo puesto en destino (landed)</h4>
         <p class="note" style="margin-top:0;margin-bottom:0">
           Las cotizaciones de proveedor son <strong>FOB</strong> (materia prima en origen).
-          Aquí estimas logística, seguro, arancel y gestión aduanera como un % único sobre FOB.
+          El recargo se aplica por origen de proveedor — el mismo modelo que usan Inicio, Fórmula y Orden de compra.
         </p>
-        <div class="slider-row">
-          <label style="font-size:13px;color:var(--muted);min-width:140px">Recargo importación</label>
-          <input type="range" id="landedPct" min="0" max="60" value="25" step="5">
-          <span class="pct-big" id="landedLbl">25%</span>
+        <div class="controls-bar" style="margin-top:12px">
+          <div class="control-group">
+            <label>Recargo China (%)</label>
+            <input type="number" id="markupChina" min="0" max="200" step="1" style="width:90px">
+          </div>
+          <div class="control-group">
+            <label>Recargo Local (%)</label>
+            <input type="number" id="markupLocal" min="0" max="200" step="1" style="width:90px">
+          </div>
         </div>
         <div class="metrics" id="importMetrics"></div>
-        <p class="note">Estos valores no alteran la matriz principal; solo aplican en esta sección y en el simulador de margen si eliges usar landed.</p>
+        <p class="note">Estos valores son los mismos que usa toda la app (db.settings.importMarkupChina/importMarkupLocal). Se guardan con "Guardar estrategia".</p>
       </div>
       <div class="card" style="margin-top:16px">
         <h4 style="font-size:14px;margin-bottom:12px;font-weight:600">Comparativa FOB vs Landed (USD/kg)</h4>
@@ -176,9 +181,7 @@
     const usd = (n, d = 2) => '<span class="usd">' + fmt(n, d) + '</span>';
 
     function getLoteKg() { return +document.getElementById('loteKg').value || 10; }
-    function getCopRate() { return +document.getElementById('copRateD').value || db.settings.fxRate || db.settings.copRate || EternoStore.DEFAULT_FX_RATE; }
-    function getLandedPct() { return +(document.getElementById('landedPct')?.value) ?? (db.settings.importMarkupPct ?? 25); }
-    function landedMult() { return 1 + getLandedPct() / 100; }
+    function getCopRate() { return +document.getElementById('copRateD').value || db.settings.fxRate || EternoStore.DEFAULT_FX_RATE; }
 
     function allPrices() { return EternoStore.getPricesFromQuotations(db); }
 
@@ -213,25 +216,32 @@
       });
     }
 
+    // Landed real: markup por origen del proveedor (EternoStore.importMarkupChina/Local),
+    // el mismo modelo que usan index.html, formula_final.html y purchase-order.html.
     function totals() {
       const ap = allPrices();
       const providers = Object.keys(ap);
       const factor = EternoStore.pctFactor(db);
-      const lm = landedMult();
-      let pickFob = 0, cheapFob = 0;
+      let pickFob = 0, cheapFob = 0, pickLanded = 0, cheapLanded = 0;
 
       db.formula.forEach(ing => {
         const pct = (ing.pct / 100) * factor;
         const ingProviders = providers.filter(p => ap[p][ing.id] != null);
-        const cheapPrice = ingProviders.length ? Math.min(...ingProviders.map(p => ap[p][ing.id])) : 0;
-        cheapFob += pct * cheapPrice;
 
-        const pick = (db.picks?.[ing.id] && ingProviders.includes(db.picks[ing.id])) ? db.picks[ing.id] : null;
+        let cheapPrice = 0, cheapProvider = null;
+        ingProviders.forEach(p => {
+          if (cheapProvider == null || ap[p][ing.id] < cheapPrice) { cheapPrice = ap[p][ing.id]; cheapProvider = p; }
+        });
+        cheapFob += pct * cheapPrice;
+        if (cheapProvider != null) cheapLanded += pct * EternoStore.landedPrice(cheapPrice, cheapProvider, db.settings);
+
+        const pick = (db.picks?.[ing.id] && ingProviders.includes(db.picks[ing.id])) ? db.picks[ing.id] : cheapProvider;
         const pickPrice = pick ? ap[pick][ing.id] : cheapPrice;
         pickFob += pct * (pickPrice ?? cheapPrice);
+        if (pick != null) pickLanded += pct * EternoStore.landedPrice(pickPrice ?? cheapPrice, pick, db.settings);
       });
 
-      return { picks: pickFob, cheap: cheapFob, picksL: pickFob * lm, cheapL: cheapFob * lm, saveVsCheap: cheapFob - pickFob };
+      return { picks: pickFob, cheap: cheapFob, picksL: pickLanded, cheapL: cheapLanded, saveVsCheap: cheapFob - pickFob };
     }
 
     // ── Cards por ingrediente ──────────────────────────────────────────────
@@ -396,7 +406,7 @@
         </div>
         <div class="scenario-card"><span class="sc-label">Selección actual</span><div class="sc-amount">$${fmt(t.picks, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
         <div class="scenario-card winner"><span class="sc-badge">Mínimo</span><span class="sc-label">Más barato posible</span><div class="sc-amount">$${fmt(t.cheap, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
-        <div class="scenario-card"><span class="sc-label">Selección landed</span><div class="sc-amount">$${fmt(t.picksL, 2)}</div><div class="sc-sub">+${getLandedPct()}% importación</div></div>
+        <div class="scenario-card"><span class="sc-label">Selección landed</span><div class="sc-amount">$${fmt(t.picksL, 2)}</div><div class="sc-sub">según origen de proveedor</div></div>
       `;
     }
 
@@ -436,11 +446,9 @@
 
     function renderImport() {
       const t = totals();
-      const pct = getLandedPct();
-      document.getElementById('landedLbl').textContent = pct + '%';
       document.getElementById('importMetrics').innerHTML = `
         <div class="metric"><div class="metric-label">Picks FOB</div><div class="metric-value">$${fmt(t.picks)}</div><div class="metric-sub">USD / kg</div></div>
-        <div class="metric"><div class="metric-label">Picks landed</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL)}</div><div class="metric-sub">+${pct}% sobre FOB</div></div>
+        <div class="metric"><div class="metric-label">Picks landed</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL)}</div><div class="metric-sub">China ${db.settings.importMarkupChina}% · Local ${db.settings.importMarkupLocal}%</div></div>
         <div class="metric"><div class="metric-label">Extra import</div><div class="metric-value">$${fmt(t.picksL - t.picks)}</div><div class="metric-sub">por kg de fórmula</div></div>
         <div class="metric"><div class="metric-label">100 ml landed</div><div class="metric-value">$${fmt(t.picksL * 0.1 * db.settings.density)}</div><div class="metric-sub">solo MP</div></div>
       `;
@@ -486,7 +494,7 @@
         <div class="metric"><div class="metric-label">Lote ${batchMl} ml</div><div class="metric-value">${kg.toFixed(3)} kg</div><div class="metric-sub">Densidad ${db.settings.density} g/ml</div></div>
         <div class="metric"><div class="metric-label">Selección actual FOB</div><div class="metric-value">$${fmt(t.picks * kg)}</div><div class="metric-sub">Δ $${fmt((t.picks - t.cheap) * kg)} vs mínimo</div></div>
         <div class="metric"><div class="metric-label">Más barato posible</div><div class="metric-value">$${fmt(t.cheap * kg)}</div><div class="metric-sub">mismo volumen</div></div>
-        <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">+${getLandedPct()}% · ajustar</a></div></div>
+        <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">según proveedor · ajustar</a></div></div>
       `;
       const max = Math.max(t.cheap * kg, t.picks * kg, 0.0001);
       document.getElementById('batchBars').innerHTML = `
@@ -559,14 +567,14 @@
       };
       document.getElementById('retailPrice').oninput = e => syncRetail(e.target.value);
       document.getElementById('retailPrice2').oninput = e => syncRetail(e.target.value);
-      const landedEl = document.getElementById('landedPct');
-      if (landedEl) {
-        landedEl.oninput = e => {
-          document.getElementById('landedLbl').textContent = e.target.value + '%';
-          db.settings.importMarkupPct = +e.target.value;
-          renderAll();
-        };
-      }
+      document.getElementById('markupChina').oninput = e => {
+        db.settings.importMarkupChina = +e.target.value || 0;
+        renderAll();
+      };
+      document.getElementById('markupLocal').oninput = e => {
+        db.settings.importMarkupLocal = +e.target.value || 0;
+        renderAll();
+      };
       document.getElementById('densityIn').oninput = e => {
         db.settings.density = +e.target.value || 0.9;
         renderAll();
@@ -602,9 +610,9 @@
     });
 
     document.getElementById('btnSave').onclick = () => {
-      db.settings.importMarkupPct = getLandedPct();
+      db.settings.importMarkupChina = +document.getElementById('markupChina').value || 0;
+      db.settings.importMarkupLocal = +document.getElementById('markupLocal').value || 0;
       db.settings.density = +document.getElementById('densityIn').value;
-      db.settings.copRate = getCopRate();
       EternoStore.saveDb(db);
       EternoStore.toast('Estrategia guardada');
     };
@@ -614,13 +622,10 @@
       EternoStore.toast('Precios sincronizados');
     };
 
-    const landedInit = document.getElementById('landedPct');
-    if (landedInit) {
-      landedInit.value = db.settings.importMarkupPct ?? 30;
-      document.getElementById('landedLbl').textContent = landedInit.value + '%';
-    }
+    document.getElementById('markupChina').value = db.settings.importMarkupChina ?? 30;
+    document.getElementById('markupLocal').value = db.settings.importMarkupLocal ?? 0;
     document.getElementById('densityIn').value  = db.settings.density ?? 0.92;
-    document.getElementById('copRateD').value   = db.settings.fxRate || db.settings.copRate || EternoStore.DEFAULT_FX_RATE;
+    document.getElementById('copRateD').value   = db.settings.fxRate || EternoStore.DEFAULT_FX_RATE;
 
     function renderMissingBanner() {
       const missing = EternoStore.getMissingIngredients(db);
