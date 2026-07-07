@@ -189,9 +189,7 @@
     let sort = { col: 'price', dir: 'asc' };
     let filters = { ing: '', prov: '', estado: '', search: '' };
 
-    function esc(s) {
-      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    }
+    const esc = EternoStore.esc;
     function badge(cls, label) { return `<span class="badge ${cls}">${label}</span>`; }
 
     const SPEC_BADGE = { ok: ['b-ok', 'OK'], warn: ['b-warn', 'Revisar'], fail: ['b-err', 'No cumple'], pending: ['b-pend', 'Pendiente'] };

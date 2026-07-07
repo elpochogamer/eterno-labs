@@ -761,6 +761,14 @@
     });
   }
 
+  // ── Formato compartido (HTML escape / número) ───────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+  function fmt(n, d = 2) {
+    return Number(n || 0).toFixed(d);
+  }
+
   // ── Toast ────────────────────────────────────────────────────────────────
   function toast(msg, ms) {
     let el = document.getElementById('eterno-toast');
@@ -815,7 +823,7 @@
     isChineseSupplier, importMarkupFactor, landedPrice, gramsForBatch,
     normalizeQuotation, detectCurrency,
     exportJson, exportBackup, shouldShowBackupReminder, summarizeBackup, readFileText, importJsonFile,
-    toast, confirmDialog,
+    toast, confirmDialog, esc, fmt,
     // Compat aliases
     providerBucket: () => 'local',
     detectBucket:   () => 'local',

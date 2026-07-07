@@ -58,9 +58,7 @@
     const covered = db.formula.filter(ing => providers.some(p => ap[p][ing.id] != null)).length;
     const missing = EternoStore.getMissingIngredients(db);
 
-    function esc(s) {
-      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    }
+    const esc = EternoStore.esc;
 
     let cogsPerKg = 0;
     db.formula.forEach(ing => {

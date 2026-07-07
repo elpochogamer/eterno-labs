@@ -176,8 +176,8 @@
     let db = EternoStore.loadDb();
     let batchMl = 100;
 
-    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
-    const fmt = (n, d = 2) => Number(n).toFixed(d);
+    const esc = EternoStore.esc;
+    const fmt = EternoStore.fmt;
     const usd = (n, d = 2) => '<span class="usd">' + fmt(n, d) + '</span>';
 
     function getLoteKg() { return +document.getElementById('loteKg').value || 10; }
@@ -640,6 +640,7 @@
     document.getElementById('btnAutoCheapest').onclick = () => {
       const ap = allPrices();
       const providers = Object.keys(ap);
+      if (!db.picks) db.picks = {};
       db.formula.forEach(ing => {
         const ingProviders = providers.filter(p => ap[p][ing.id] != null);
         if (!ingProviders.length) return;
@@ -648,8 +649,9 @@
           const blp = EternoStore.landedPrice(ap[best][ing.id], best, db.settings);
           return lp < blp ? p : best;
         });
-        EternoStore.savePick(db, ing.id, cheapest);
+        db.picks[ing.id] = cheapest;
       });
+      EternoStore.saveDb(db);
       renderAll();
       EternoStore.toast('Seleccionado más barato por costo landed');
     };

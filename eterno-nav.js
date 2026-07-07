@@ -18,9 +18,7 @@
     return p || 'index.html';
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  }
+  const esc = global.EternoStore.esc;
 
   function buildNav() {
     const file = currentFile();

@@ -59,8 +59,8 @@
   <script>
     let db = EternoStore.loadDb();
 
-    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
-    const fmt = (n, d = 2) => Number(n).toFixed(d);
+    const esc = EternoStore.esc;
+    const fmt = EternoStore.fmt;
 
     const PHASE_LABEL = {
       A: 'Portadores base', B: 'Portador activo secundario', C: 'Activos CO₂ lipofílicos I',
