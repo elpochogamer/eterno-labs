@@ -334,7 +334,6 @@
         safetyMarginPct: 10,
         importMarkupChina: 30,
         importMarkupLocal: 0,
-        importMarkupPct: 30, // deprecated — el comparador ya usa importMarkupChina/importMarkupLocal; se mantiene por compat con JSON viejos
         supplierP1: 'P1 China',
         supplierP2: 'P2 Imagen',
         lastBackupAt: null,
