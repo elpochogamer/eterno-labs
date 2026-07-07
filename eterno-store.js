@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
   const DB_KEY         = 'eterno_database_v1';
-  const SCHEMA         = 4;
+  const SCHEMA         = 5;
   const DEFAULT_BATCH_G = 445;
   const DEFAULT_FX_RATE = 3650;
   const CURRENCIES      = ['COP', 'USD'];
@@ -143,6 +143,23 @@
     { id:'q-1780523429007', ingId:'rice',     provider:'marath',          price:26.548, currency:'USD', moq:0.03, spec:'pending', status:'cotizado',  compat:'pending', incoterm:'EXW', notes:'' },
   ];
 
+  // ── Alias de proveedores duplicados por typo/mayúsculas ─────────────────
+  // Case-insensitive. Usado por migrate() y por buildQuotationRecord() para
+  // que entradas manuales / importaciones futuras normalicen automáticamente.
+  const SUPPLIER_ALIASES = {
+    'g&m': 'G&M Química',
+    'phitother': 'Laboratorios Phitother S.A.S',
+    'phitither': 'Laboratorios Phitother S.A.S',
+    'pochteca': 'Pochteca Colombia',
+    'sumiquim': 'Sumiquim S.A.S',
+    'sumilab': 'SUMILAB',
+  };
+
+  function resolveSupplierAlias(name) {
+    const key = String(name || '').trim().toLowerCase();
+    return SUPPLIER_ALIASES[key] || String(name || '').trim();
+  }
+
   // ── Helpers de moneda ────────────────────────────────────────────────────
   function detectCurrency(q) {
     if (q.currency) return q.currency;
@@ -226,7 +243,7 @@
   }
 
   function getSuppliers(db) {
-    return db.suppliers || [];
+    return (db.suppliers || []).filter(s => !s.mergedInto);
   }
 
   function addSupplier(db, data) {
@@ -337,6 +354,7 @@
 
     const fromV1 = !db.version || db.version < 2;
     const fromV3 = !db.version || db.version < 4;
+    const fromV4 = !db.version || db.version < 5;
 
     db.meta     = db.meta || base.meta;
     db.settings = { ...base.settings, ...db.settings };
@@ -412,6 +430,25 @@
 
     // Suppliers directory: build/merge from provider names (idempotent, matching por nombre exacto)
     db.suppliers = Array.isArray(db.suppliers) ? db.suppliers : [];
+
+    // Fusionar proveedores duplicados por typo/mayúsculas (idempotente): reescribe
+    // q.provider al nombre canónico, preserva el original en providerOriginal, y
+    // repunta q.supplierId para que el sync de abajo no lo vuelva a pisar con el
+    // supplier viejo asociado al supplierId desactualizado.
+    const mergedByGroup = {};
+    db.quotations.forEach(q => {
+      const canonical = resolveSupplierAlias(q.provider);
+      if (canonical !== q.provider) {
+        if (q.providerOriginal === undefined) q.providerOriginal = q.provider;
+        mergedByGroup[canonical] = (mergedByGroup[canonical] || 0) + 1;
+        q.provider = canonical;
+        q.supplierId = matchOrCreateSupplier(db, canonical).id;
+      }
+    });
+    if (fromV4 && Object.keys(mergedByGroup).length) {
+      console.warn('Eterno: proveedores fusionados por alias →', mergedByGroup);
+    }
+
     db.quotations.forEach(q => {
       let s = q.supplierId ? db.suppliers.find(x => x.id === q.supplierId) : null;
       if (!s) s = findSupplierByName(db, q.provider);
@@ -419,6 +456,29 @@
       q.supplierId = s.id;
       // keep provider name in sync with directory display name
       q.provider = s.name;
+    });
+
+    // Fichas de proveedor huérfanas (alias conocido, ya sin cotizaciones propias
+    // tras el remapeo de arriba): fusionar contacto/notas hacia la ficha canónica
+    // (solo rellenar huecos, nunca pisar datos ya presentes) y marcarlas con
+    // mergedInto — nunca se borran, solo quedan ocultas del directorio.
+    const activeSupplierIds = new Set(db.quotations.map(q => q.supplierId));
+    Object.keys(SUPPLIER_ALIASES).forEach(aliasKey => {
+      const canonical = findSupplierByName(db, SUPPLIER_ALIASES[aliasKey]);
+      if (!canonical) return;
+      db.suppliers.forEach(s => {
+        if (s.id === canonical.id || s.mergedInto) return;
+        if ((s.name || '').trim().toLowerCase() !== aliasKey) return;
+        if (activeSupplierIds.has(s.id)) return;
+        if (s.contact) {
+          canonical.contact = canonical.contact || { nombre: null, email: null, telefono: null };
+          Object.keys(s.contact).forEach(k => {
+            if (!canonical.contact[k] && s.contact[k]) canonical.contact[k] = s.contact[k];
+          });
+        }
+        if (s.notes && !canonical.notes) canonical.notes = s.notes;
+        s.mergedInto = canonical.id;
+      });
     });
 
     // Picks: migrate hybrid → picks, remove obsolete, add new ingredients
@@ -569,11 +629,17 @@
   }
 
   function buildQuotationRecord(data, db, existing) {
-    const supplier = matchOrCreateSupplier(db, String(data.provider).trim());
+    const enteredProvider = String(data.provider).trim();
+    const canonicalProvider = resolveSupplierAlias(enteredProvider);
+    const supplier = matchOrCreateSupplier(db, canonicalProvider);
+    const providerOriginal = existing && existing.providerOriginal !== undefined
+      ? existing.providerOriginal
+      : (canonicalProvider !== enteredProvider ? enteredProvider : undefined);
     const q = {
       id: existing?.id || data.id || 'q-' + Date.now(),
       ingId: data.ingId,
       provider: supplier.name,
+      providerOriginal,
       supplierId: supplier.id,
       price: Number(data.price),
       currency: data.currency,
@@ -737,6 +803,7 @@
   global.EternoStore = {
     DB_KEY, SCHEMA, FORMULA_INGREDIENTS, OBSOLETE_IDS, DEFAULT_PICKS,
     DEFAULT_FX_RATE, DEFAULT_BATCH_G, CURRENCIES, UNITS, BACKUP_REMINDER_DAYS,
+    SUPPLIER_ALIASES, resolveSupplierAlias,
     loadDb, saveDb, defaultDb, migrate,
     sumPct, pctFactor, nameToId, getIngredient, getFormula,
     getPricesFromQuotations, getMissingIngredients, getQuotations,
