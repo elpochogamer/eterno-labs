@@ -157,6 +157,7 @@
       const list = db.quotations
         .filter(q => q.ingId === ingId &&
                      q.status !== 'obsoleto — fuera de fórmula' &&
+                     !q.unitWarning &&
                      (onlyCompat ? q.compat !== 'no' : true))
         .sort((a, b) =>
           EternoStore.landedPrice(a.price, a.provider, db.settings) -

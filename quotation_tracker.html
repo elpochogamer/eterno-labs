@@ -385,7 +385,7 @@
     document.getElementById('btnCancel').onclick = closeModal;
     document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
 
-    document.getElementById('btnSave').onclick = () => {
+    document.getElementById('btnSave').onclick = async () => {
       const data = {
         ingId: document.getElementById('fIng').value,
         provider: document.getElementById('fProv').value.trim(),
@@ -403,6 +403,15 @@
         compat: document.getElementById('fCompat').value,
         notes: document.getElementById('fNotes').value.trim(),
       };
+      if (data.unit !== 'kg') {
+        const ok = await EternoStore.confirmDialog({
+          title: 'Unidad distinta de kg',
+          message: 'El motor de costos solo interpreta USD/kg. Esta cotización quedará EXCLUIDA de comparaciones y auto-selección hasta normalizarse a kg.',
+          okLabel: 'Guardar de todas formas',
+          cancelLabel: 'Cancelar',
+        });
+        if (!ok) return;
+      }
       const result = editId ? EternoStore.updateQuotation(db, editId, data) : EternoStore.addQuotation(db, data);
       if (!result.ok) { showError(result.error); return; }
       populateFilterSelects();

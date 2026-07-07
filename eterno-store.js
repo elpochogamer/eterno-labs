@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
   const DB_KEY         = 'eterno_database_v1';
-  const SCHEMA         = 3;
+  const SCHEMA         = 4;
   const DEFAULT_BATCH_G = 445;
   const DEFAULT_FX_RATE = 3650;
   const CURRENCIES      = ['COP', 'USD'];
@@ -264,16 +264,30 @@
     return d.getTime() < today.getTime();
   }
 
+  // ── Unidad de presentación ───────────────────────────────────────────────
+  // El motor de costos solo interpreta price como USD/kg. Cualquier cotización
+  // con unit != 'kg' se marca con unitWarning y queda excluida de auto-pick,
+  // comparación de "más barato" y generación de PO hasta normalizarse a kg.
+  function computeUnitWarning(q) {
+    return !!(q.unit && q.unit !== 'kg');
+  }
+
   function isUsable(q) {
     return q.compat !== 'no' &&
            q.status !== 'obsoleto — fuera de fórmula' &&
            q.status !== 'descartado' &&
+           !q.unitWarning &&
            !isExpired(q);
+  }
+
+  function getUnitWarningQuotations(db) {
+    return db.quotations.filter(q => q.unitWarning);
   }
 
   function quotationStateBadge(q) {
     if (q.status === 'obsoleto — fuera de fórmula') return { cls: 'b-obsoleto', label: 'Obsoleto' };
     if (isExpired(q)) return { cls: 'b-vencido', label: 'Vencido' };
+    if (q.unitWarning) return { cls: 'b-warn', label: 'Unidad≠kg' };
     if (q.compat === 'no') return { cls: 'b-incompatible', label: 'Incompatible' };
     if (q.compat === 'yes') return { cls: 'b-compatible', label: 'Compatible' };
     return { cls: 'b-pend', label: 'Pendiente' };
@@ -322,6 +336,7 @@
     if (!db || typeof db !== 'object') return base;
 
     const fromV1 = !db.version || db.version < 2;
+    const fromV3 = !db.version || db.version < 4;
 
     db.meta     = db.meta || base.meta;
     db.settings = { ...base.settings, ...db.settings };
@@ -385,6 +400,14 @@
           }
         });
       }
+    }
+
+    // unitWarning es puro función de q.unit — recomputar incondicionalmente
+    // en cada migrate() (idempotente, cubre ambas ramas de arriba).
+    db.quotations.forEach(q => { q.unitWarning = computeUnitWarning(q); });
+    if (fromV3) {
+      const warnedCount = db.quotations.filter(q => q.unitWarning).length;
+      console.warn(`Eterno: ${warnedCount} cotización(es) marcada(s) con unitWarning (unidad ≠ kg) al migrar a schema v${SCHEMA}.`);
     }
 
     // Suppliers directory: build/merge from provider names (idempotent, matching por nombre exacto)
@@ -568,6 +591,7 @@
       date: existing?.date || data.date || new Date().toLocaleDateString('es-CO'),
     };
     normalizeQuotation(q, db.settings.fxRate);
+    q.unitWarning = computeUnitWarning(q);
     return q;
   }
 
@@ -720,7 +744,7 @@
     getSettings, updateSettings,
     addQuotation, updateQuotation, deleteQuotation, validateQuotationInput,
     getSuppliers, addSupplier, updateSupplier, matchOrCreateSupplier, findSupplierByName,
-    isExpired, isUsable, quotationStateBadge,
+    isExpired, isUsable, quotationStateBadge, getUnitWarningQuotations,
     isChineseSupplier, importMarkupFactor, landedPrice, gramsForBatch,
     normalizeQuotation, detectCurrency,
     exportJson, exportBackup, shouldShowBackupReminder, summarizeBackup, readFileText, importJsonFile,

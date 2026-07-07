@@ -184,7 +184,7 @@
 
     function quotaFor(provName, ingId) {
       return db.quotations
-        .filter(q => q.provider === provName && q.ingId === ingId && q.compat !== 'no')
+        .filter(q => q.provider === provName && q.ingId === ingId && q.compat !== 'no' && !q.unitWarning)
         .sort((a, b) => a.price - b.price)[0] || null;
     }
 

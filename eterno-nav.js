@@ -41,6 +41,7 @@
         </div>
       </nav>
       <div id="ternoBackupReminder"></div>
+      <div id="ternoUnitWarningBanner"></div>
     `;
   }
 
@@ -66,6 +67,19 @@
       </div>`;
     const btn = document.getElementById('ternoBtnBackupNow');
     if (btn) btn.onclick = doExport;
+  }
+
+  function renderUnitWarningBanner() {
+    const el = document.getElementById('ternoUnitWarningBanner');
+    if (!el || !global.EternoStore) return;
+    const db = EternoStore.loadDb();
+    const warned = EternoStore.getUnitWarningQuotations(db);
+    if (!warned.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <div class="banner banner-warn" style="margin:0 0 16px">
+        <span>⚠ ${warned.length} cotización${warned.length === 1 ? '' : 'es'} excluida${warned.length === 1 ? '' : 's'} por unidad ≠ kg.</span>
+        <a class="btn btn-sm" href="quotation_tracker.html">Ver cotizaciones</a>
+      </div>`;
   }
 
   function doExport() {
@@ -122,6 +136,7 @@
     mount.innerHTML = buildNav();
     renderStatusPill();
     renderBackupReminder();
+    renderUnitWarningBanner();
     bindActions();
   }
 
