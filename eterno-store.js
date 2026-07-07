@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
   const DB_KEY         = 'eterno_database_v1';
-  const SCHEMA         = 5;
+  const SCHEMA         = 6;
   const DEFAULT_BATCH_G = 445;
   const DEFAULT_FX_RATE = 3650;
   const CURRENCIES      = ['COP', 'USD'];
@@ -15,15 +15,15 @@
 
   // ── Fórmula definitiva 13 ingredientes — lote base 445 g ────────────────
   const FORMULA_INGREDIENTS = [
-    { id:'cct',      phase:'A', name:'CCT (Triglicérido Caprílico/Cáprico)', inci:'Caprylic/Capric Triglyceride',        pct:37.15, cat:'carrier' },
-    { id:'hemisq',   phase:'A', name:'Hemisqualane',                          inci:'Hemisqualane',                         pct:24.00, cat:'carrier' },
+    { id:'cct',      phase:'A', name:'CCT (Triglicérido Caprílico/Cáprico)', inci:'Caprylic/Capric Triglyceride',        pct:36.20, cat:'carrier' },
+    { id:'hemisq',   phase:'A', name:'Hemisqualane',                          inci:'Hemisqualane',                         pct:24.90, cat:'carrier' },
     { id:'squalane', phase:'A', name:'Squalane (Oliva)',                      inci:'Squalane',                             pct: 8.00, cat:'carrier' },
     { id:'grapeseed',phase:'A', name:'Vitis Vinifera (Semilla de Uva)',       inci:'Vitis Vinifera Seed Oil',              pct:13.00, cat:'carrier' },
     { id:'rice',     phase:'B', name:'Oryza Sativa (Salvado de Arroz)',       inci:'Oryza Sativa Bran Oil',               pct:10.00, cat:'carrier' },
     { id:'saw',      phase:'C', name:'Serenoa CO₂ (Saw Palmetto)',       inci:'Serenoa Serrulata Fruit Extract',     pct: 2.00, cat:'active'  },
     { id:'iso',      phase:'C', name:'Isochrysis CO₂',                   inci:'Isochrysis Galbana Extract',          pct: 2.00, cat:'active'  },
     { id:'ginseng',  phase:'D', name:'Panax Ginseng CO₂',               inci:'Panax Ginseng Root Extract',          pct: 2.00, cat:'active'  },
-    { id:'rosemary', phase:'D', name:'Rosmarinus CO₂',                   inci:'Rosmarinus Officinalis Leaf Extract', pct: 0.75, cat:'active'  },
+    { id:'rosemary', phase:'D', name:'Rosmarinus CO₂',                   inci:'Rosmarinus Officinalis Leaf Extract', pct: 0.80, cat:'active'  },
     { id:'melatonin',phase:'E', name:'Melatonin',                             inci:'Melatonin',                            pct: 0.10, cat:'active'  },
     { id:'toco',     phase:'F', name:'Tocopherol d-α',                   inci:'Tocopherol',                           pct: 0.64, cat:'ao'      },
     { id:'ascpal',   phase:'F', name:'Ascorbyl Palmitate',                    inci:'Ascorbyl Palmitate',                   pct: 0.16, cat:'ao'      },
@@ -316,7 +316,7 @@
     const fxRate = DEFAULT_FX_RATE;
     const db = {
       version: SCHEMA,
-      meta: { formulaName: 'Aceite Capilar — Definitiva v2', updatedAt: now, createdAt: now },
+      meta: { formulaName: 'Aceite Capilar — Definitiva v3', updatedAt: now, createdAt: now },
       formula: FORMULA_INGREDIENTS.map(i => ({ ...i })),
       quotations: DEFAULT_QUOTATIONS.map((q, idx) => {
         const nq = { id: q.id || 'seed-' + (idx + 1), ...q,
@@ -355,6 +355,7 @@
     const fromV1 = !db.version || db.version < 2;
     const fromV3 = !db.version || db.version < 4;
     const fromV4 = !db.version || db.version < 5;
+    const fromV5 = !db.version || db.version < 6;
 
     db.meta     = db.meta || base.meta;
     db.settings = { ...base.settings, ...db.settings };
@@ -370,9 +371,11 @@
     db.poDraft        = db.poDraft || { batchSizeG: DEFAULT_BATCH_G, lines: {} };
     if (!db.poDraft.batchSizeG) db.poDraft.batchSizeG = db.poDraft.batchKg ? db.poDraft.batchKg * 1000 : DEFAULT_BATCH_G;
 
-    // Formula: replace on v1→v2 migration or if new ingredients missing
+    // Formula: replace on v1→v2 migration, if new ingredients missing, or if
+    // upgrading from a schema below v6 (fuerza resync de valores canónicos v3,
+    // ya que hasNewFormula solo detecta ids nuevos, no cambios de pct en ids existentes).
     const hasNewFormula = Array.isArray(db.formula) && db.formula.find(i => i.id === 'hemisq');
-    if (fromV1 || !hasNewFormula) {
+    if (fromV1 || !hasNewFormula || fromV5) {
       db.formula = base.formula;
     } else {
       db.formula = db.formula.length ? db.formula : base.formula;
@@ -425,6 +428,9 @@
     if (fromV3) {
       const warnedCount = db.quotations.filter(q => q.unitWarning).length;
       console.warn(`Eterno: ${warnedCount} cotización(es) marcada(s) con unitWarning (unidad ≠ kg) al migrar a schema v${SCHEMA}.`);
+    }
+    if (fromV5) {
+      console.warn('Eterno: fórmula actualizada a valores canónicos v3 (CCT 36.20% / Hemisqualane 24.90% / Rosmarinus 0.80%) al migrar a schema v6.');
     }
 
     // Suppliers directory: build/merge from provider names (idempotent, matching por nombre exacto)
