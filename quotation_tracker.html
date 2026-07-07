@@ -212,6 +212,11 @@
       document.getElementById('provList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
     }
 
+    // Por diseño esta vista NO oculta incompatibles/unitWarning por defecto (a diferencia
+    // de supplier_cost_comparison_dashboard.html y purchase-order.html, que sí filtran):
+    // es la vista de auditoría, muestra el universo completo vía quotationStateBadge().
+    // El filtro "Estado" (#fEstado, abajo) ya permite al usuario aislar manualmente
+    // "Compatible" si quiere ocultar el resto — no agregar un filtro automático aquí.
     function filteredQuotations() {
       return db.quotations.filter(q => {
         if (filters.ing && q.ingId !== filters.ing) return false;
