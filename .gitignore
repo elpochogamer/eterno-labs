@@ -7,3 +7,5 @@ build/
 .idea/
 .vscode/
 package-lock.json
+eterno_backup_*.json
+eterno_database_*.json
