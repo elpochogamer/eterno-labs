@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eterno Labs — Decisión de compra (USD)</title>
+  <title>Eterno Labs — Costos y márgenes (USD)</title>
   <script>(function(){try{var t=localStorage.getItem('eterno_theme')||'auto';var d=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();</script>
   <link rel="stylesheet" href="./eterno-ui.css">
 </head>
@@ -13,11 +13,11 @@
 
     <header class="page-header">
       <div>
-        <h1 class="page-title">Unit economics &amp; COGS</h1>
-        <p class="page-sub">Compara escenarios de proveedor y define tu mix óptimo para maximizar margen sin perder spec.</p>
+        <h1 class="page-title">Costos y márgenes</h1>
+        <p class="page-sub">Selecciona la cotización de cada ingrediente y mira el impacto en costo y margen en vivo.</p>
       </div>
       <div class="toolbar">
-        <button type="button" class="btn" id="btnAutoCheapest">Auto: elegir más barato</button>
+        <button type="button" class="btn" id="btnAllAuto">↻ Todo automático</button>
         <button type="button" class="btn" id="btnSync">↻ Actualizar precios</button>
         <button type="button" class="btn btn-primary" id="btnSave">Guardar estrategia</button>
       </div>
@@ -55,7 +55,6 @@
     <div class="tabs">
       <button type="button" class="tab active" data-tab="t1">Por ingrediente</button>
       <button type="button" class="tab" data-tab="t2">Economía por lote</button>
-      <button type="button" class="tab" data-tab="t3">Mix de compra</button>
       <button type="button" class="tab" data-tab="t4">Margen</button>
       <button type="button" class="tab" data-tab="t6">Importación</button>
       <button type="button" class="tab" data-tab="t5">Riesgos</button>
@@ -66,10 +65,15 @@
     <!-- Por ingrediente -->
     <div id="t1" class="panel active">
       <div class="ing-cards" id="ingCards"></div>
-      <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin:20px 0 10px">MATRIZ COMPLETA POR PROVEEDOR</h4>
+      <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin:20px 0 10px">MATRIZ DE SELECCIÓN POR COTIZACIÓN</h4>
       <div class="table-wrap" id="picksTableWrap"></div>
       <p class="note" id="tableNote"></p>
       <div id="providerCards" style="margin-top:20px"></div>
+      <div class="card" style="margin-top:20px">
+        <h4 style="font-size:14px;margin-bottom:12px">Lista de compra — selección actual</h4>
+        <ul class="proc-list" id="procList"></ul>
+        <p class="note" style="margin-top:12px" id="procTotal"></p>
+      </div>
     </div>
 
     <!-- Lotes -->
@@ -77,37 +81,15 @@
       <div class="toolbar" id="sizeButtons" style="margin-bottom:16px"></div>
       <div class="metrics" id="batchMetrics"></div>
       <div class="card">
-        <h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">COGS por escenario (USD)</h4>
+        <h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">Costo MP por escenario (USD)</h4>
         <div id="batchBars"></div>
-      </div>
-    </div>
-
-    <!-- Mix compra -->
-    <div id="t3" class="panel">
-      <div class="decision-grid">
-        <div class="card">
-          <h4 style="font-size:14px;margin-bottom:12px">Lista de compra — selección actual</h4>
-          <ul class="proc-list" id="procList"></ul>
-          <p class="note" style="margin-top:12px" id="procTotal"></p>
-        </div>
-        <div class="card">
-          <h4 style="font-size:14px;margin-bottom:12px">Configurar proveedor por ingrediente</h4>
-          <div class="table-wrap">
-            <table class="responsive">
-              <thead>
-                <tr><th>Ingrediente</th><th class="th-num">Más barato</th><th class="th-num">Seleccionado</th><th>Proveedor</th><th class="th-num">Δ vs mínimo</th></tr>
-              </thead>
-              <tbody id="hybridTable"></tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
 
     <!-- Margen -->
     <div id="t4" class="panel">
       <div class="card">
-        <h4 style="font-size:14px;margin-bottom:16px">Simulador de margen bruto (materia prima)</h4>
+        <h4 style="font-size:14px;margin-bottom:16px">Simulador de margen bruto</h4>
         <div class="margin-sim">
           <div class="field">
             <label>Precio venta (USD / 100 ml)</label>
@@ -176,102 +158,80 @@
   <script src="./eterno-nav.js"></script>
   <script>
     let db = EternoStore.loadDb();
+    {
+      const pruned = EternoStore.consumePrunedSelections();
+      if (pruned.length) EternoStore.toast(`${pruned.length} selección(es) volvieron a automático (cotización eliminada)`);
+    }
     let batchMl = 100;
 
     const esc = EternoStore.esc;
     const fmt = EternoStore.fmt;
-    const usd = (n, d = 2) => '<span class="usd">' + fmt(n, d) + '</span>';
 
     function getLoteKg() { return +document.getElementById('loteKg').value || 10; }
     function getCopRate() { return +document.getElementById('copRateD').value || db.settings.fxRate || EternoStore.DEFAULT_FX_RATE; }
 
-    function allPrices() { return EternoStore.getPricesFromQuotations(db); }
-
-    function quotaFor(provName, ingId) {
-      return db.quotations
-        .filter(q => q.provider === provName && q.ingId === ingId && q.compat !== 'no' && !q.unitWarning)
-        .sort((a, b) => a.price - b.price)[0] || null;
-    }
-
-    function getPickRows() {
-      const ap = allPrices();
-      const providers = Object.keys(ap);
+    // ── Filas de la matriz: una por ingrediente, con la selección vigente ──
+    function getRows() {
       const factor = EternoStore.pctFactor(db);
-      const loteKg = getLoteKg();
-
       return db.formula.map(ing => {
         const pct = (ing.pct / 100) * factor;
-        const ingProviders = providers.filter(p => ap[p][ing.id] != null);
-
-        let cheapestPrice = Infinity, cheapestProvider = null;
-        ingProviders.forEach(p => {
-          if (ap[p][ing.id] < cheapestPrice) { cheapestPrice = ap[p][ing.id]; cheapestProvider = p; }
-        });
-        if (cheapestPrice === Infinity) { cheapestPrice = null; cheapestProvider = null; }
-
-        const currentPick = (db.picks?.[ing.id] && ingProviders.includes(db.picks[ing.id]))
-          ? db.picks[ing.id] : cheapestProvider;
-        const pickPrice = (currentPick && ap[currentPick]) ? ap[currentPick][ing.id] ?? null : null;
-        const subtotal = (pickPrice != null) ? pct * pickPrice * loteKg : null;
-
-        return { ing, pct, ingProviders, ap, currentPick, pickPrice, subtotal, cheapestProvider, cheapestPrice };
+        const sel = EternoStore.getSelected(db, ing.id);
+        const auto = EternoStore.autoPick(db, ing.id);
+        const price = sel ? sel.q.price : null;
+        const contrib = price != null ? pct * price : null; // USD por kg de fórmula
+        return { ing, pct, sel, auto, price, contrib };
       });
     }
 
-    // Landed real: markup por origen del proveedor (EternoStore.importMarkupChina/Local),
-    // el mismo modelo que usan index.html, formula_final.html y purchase-order.html.
+    // FOB crudo para comparar escenarios; landed solo en Importación/Margen.
     function totals() {
-      const ap = allPrices();
-      const providers = Object.keys(ap);
       const factor = EternoStore.pctFactor(db);
-      let pickFob = 0, cheapFob = 0, pickLanded = 0, cheapLanded = 0;
-
+      let sel = 0, auto = 0, selL = 0, autoL = 0, eligibleCount = 0;
       db.formula.forEach(ing => {
         const pct = (ing.pct / 100) * factor;
-        const ingProviders = providers.filter(p => ap[p][ing.id] != null);
-
-        let cheapPrice = 0, cheapProvider = null;
-        ingProviders.forEach(p => {
-          if (cheapProvider == null || ap[p][ing.id] < cheapPrice) { cheapPrice = ap[p][ing.id]; cheapProvider = p; }
-        });
-        cheapFob += pct * cheapPrice;
-        if (cheapProvider != null) cheapLanded += pct * EternoStore.landedPrice(cheapPrice, cheapProvider, db.settings);
-
-        const pick = (db.picks?.[ing.id] && ingProviders.includes(db.picks[ing.id])) ? db.picks[ing.id] : cheapProvider;
-        const pickPrice = pick ? ap[pick][ing.id] : cheapPrice;
-        pickFob += pct * (pickPrice ?? cheapPrice);
-        if (pick != null) pickLanded += pct * EternoStore.landedPrice(pickPrice ?? cheapPrice, pick, db.settings);
+        const s = EternoStore.getSelected(db, ing.id);
+        const a = EternoStore.autoPick(db, ing.id);
+        if (a) {
+          eligibleCount++;
+          auto  += pct * a.price;
+          autoL += pct * EternoStore.landedPrice(a.price, a.provider, db.settings);
+        }
+        if (s) {
+          sel  += pct * s.q.price;
+          selL += pct * EternoStore.landedPrice(s.q.price, s.q.provider, db.settings);
+        }
       });
-
-      return { picks: pickFob, cheap: cheapFob, picksL: pickLanded, cheapL: cheapLanded, saveVsCheap: cheapFob - pickFob };
+      return { sel, auto, selL, autoL, eligibleCount, saving: sel - auto };
     }
 
     // ── Cards por ingrediente ──────────────────────────────────────────────
     function renderIngredientCards() {
-      const rows = getPickRows();
+      const rows = getRows();
       const el = document.getElementById('ingCards');
       el.innerHTML = rows.map(r => {
-        const pickQuote = r.currentPick ? quotaFor(r.currentPick, r.ing.id) : null;
-        const stBadge = pickQuote ? EternoStore.quotationStateBadge(pickQuote) : { cls: 'b-pend', label: 'Sin cotización' };
-        if (r.pickPrice == null) {
+        if (!r.sel) {
           return `<div class="ing-card">
             <div class="ic-name">${esc(r.ing.name)}</div>
             <div class="ic-inci">${esc(r.ing.inci)}</div>
             <div class="empty-state" style="padding:12px 0">
-              <div class="empty-sub" style="margin-bottom:10px">Sin cotización compatible</div>
+              <div class="empty-sub" style="margin-bottom:10px">Sin cotización elegible</div>
               <a class="btn btn-sm btn-primary" href="quotation_tracker.html?add=${encodeURIComponent(r.ing.id)}">+ Cotización</a>
             </div>
           </div>`;
         }
-        const altDelta = (r.cheapestProvider && r.cheapestProvider !== r.currentPick)
-          ? `<div class="ic-row"><span>Alternativa (${esc(r.cheapestProvider)})</span><span class="td-save">$${fmt(r.cheapestPrice)}/kg</span></div>`
-          : `<div class="ic-row"><span>Alternativa</span><span class="ghost">ya es la más barata</span></div>`;
+        const stBadge = EternoStore.quotationStateBadge(r.sel.q);
+        const srcBadge = r.sel.source === 'manual'
+          ? '<span class="badge b-ao">manual</span>'
+          : '<span class="badge b-carrier">↻ auto</span>';
+        const altRow = (r.auto && r.auto.id !== r.sel.q.id)
+          ? `<div class="ic-row"><span>Mínimo (${esc(r.auto.provider)})</span><span class="td-save">$${fmt(r.auto.price)}/kg</span></div>`
+          : `<div class="ic-row"><span>Mínimo</span><span class="ghost">ya es la más barata</span></div>`;
         return `<div class="ing-card">
           <div class="ic-name">${esc(r.ing.name)} <span class="badge ${stBadge.cls}" style="float:right">${stBadge.label}</span></div>
           <div class="ic-inci">${esc(r.ing.inci)}</div>
-          <div class="ic-row"><span>Pick actual</span><span><strong>${esc(r.currentPick)}</strong> — $${fmt(r.pickPrice)}/kg</span></div>
-          <div class="ic-row"><span>Costo en lote (${EternoStore.DEFAULT_BATCH_G} g)</span><span>$${fmt(r.pct * r.pickPrice * EternoStore.DEFAULT_BATCH_G / 1000)}</span></div>
-          ${altDelta}
+          <div class="ic-row"><span>Selección ${srcBadge}</span><span><strong>${esc(r.sel.q.provider)}</strong> — $${fmt(r.price)}/kg</span></div>
+          <div class="ic-row"><span>Costo en lote (${EternoStore.DEFAULT_BATCH_G} g)</span><span>$${fmt(r.contrib * EternoStore.DEFAULT_BATCH_G / 1000)}</span></div>
+          ${altRow}
           <div style="margin-top:10px"><a class="compare-link" href="quotation_tracker.html?add=${encodeURIComponent(r.ing.id)}">+ Agregar otra cotización</a></div>
         </div>`;
       }).join('');
@@ -279,13 +239,13 @@
 
     // ── Resumen de costo + desglose % (barras CSS) ─────────────────────────
     function renderCostSummary() {
-      const rows = getPickRows();
+      const rows = getRows();
       const batchG = db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G;
       const mlUnit = db.settings.mlPerUnit || 30;
       const density = db.settings.density || 0.92;
       let batchTotal = 0;
       const lineCosts = rows.map(r => {
-        const cost = r.pickPrice != null ? r.pct * r.pickPrice * batchG / 1000 : 0;
+        const cost = r.contrib != null ? r.contrib * batchG / 1000 : 0;
         batchTotal += cost;
         return { ing: r.ing, cost };
       });
@@ -293,9 +253,9 @@
       const costPerUnit = batchTotal * (kgPerUnit / (batchG / 1000));
 
       document.getElementById('costSummaryMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">Costo total del lote</div><div class="metric-value">$${fmt(batchTotal)}</div><div class="metric-sub">${batchG} g · picks actuales</div></div>
+        <div class="metric"><div class="metric-label">Costo total del lote</div><div class="metric-value">$${fmt(batchTotal)}</div><div class="metric-sub">${batchG} g · selección actual</div></div>
         <div class="metric"><div class="metric-label">Costo por ${mlUnit} ml</div><div class="metric-value">$${fmt(costPerUnit)}</div><div class="metric-sub">materia prima únicamente</div></div>
-        <div class="metric"><div class="metric-label">Ingredientes con costo</div><div class="metric-value">${lineCosts.filter(l => l.cost > 0).length}/${rows.length}</div><div class="metric-sub">según picks actuales</div></div>
+        <div class="metric"><div class="metric-label">Ingredientes con costo</div><div class="metric-value">${lineCosts.filter(l => l.cost > 0).length}/${rows.length}</div><div class="metric-sub">según selección actual</div></div>
       `;
 
       const max = Math.max(...lineCosts.map(l => l.cost), 0.0001);
@@ -311,64 +271,96 @@
         }).join('');
     }
 
-    // ── RENDER T1: tabla dinámica ──────────────────────────────────────────
+    // ── Matriz de selección: un <select> de cotizaciones por ingrediente ──
+    function optionLabel(q) {
+      return `${q.provider} — $${fmt(q.price)}/kg — MOQ ${q.moq}kg`;
+    }
+
     function renderPicksTable() {
-      const rows = getPickRows();
-      const ap = allPrices();
-      const providers = Object.keys(ap);
-      const loteKg = getLoteKg();
-      const copRate = getCopRate();
+      const rows = getRows();
 
-      const thProvs = providers.map(p => `<th class="th-num" style="white-space:nowrap">${esc(p)}</th>`).join('');
-      const thead = `<thead><tr><th>Ingrediente</th>${thProvs}<th class="th-num">Seleccionado</th></tr></thead>`;
+      const thead = `<thead><tr>
+        <th>Ingrediente</th>
+        <th class="th-num">% fórmula</th>
+        <th>Cotización</th>
+        <th>Proveedor</th>
+        <th class="th-num">USD/kg</th>
+        <th class="th-num">Contrib. USD/kg</th>
+        <th class="th-num">MOQ</th>
+        <th class="th-num">Mín. compra USD</th>
+        <th>Origen</th>
+      </tr></thead>`;
 
-      let totalPicks = 0;
+      let totalContrib = 0;
       const tbodyRows = rows.map(r => {
-        totalPicks += r.subtotal ?? 0;
-        const ingPct = (r.pct * 100).toFixed(2);
+        totalContrib += r.contrib ?? 0;
+        const qs = db.quotations.filter(q => q.ingId === r.ing.id);
+        const eligible = qs.filter(EternoStore.isEligible).sort((a, b) => a.price - b.price);
+        const ineligible = qs.filter(q => !EternoStore.isEligible(q));
 
-        const provCells = providers.map(p => {
-          const price = ap[p][r.ing.id];
-          if (price == null) return `<td class="td-num" style="color:var(--muted)">—</td>`;
-          const isBest = p === r.cheapestProvider;
-          const isPicked = p === r.currentPick;
-          const q = quotaFor(p, r.ing.id);
-          const moqTxt = q ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">MOQ ${q.moq} kg</div>` : '';
-          const bestBadge = isBest ? `<div><span class="badge b-ok" style="font-size:10px;padding:1px 5px">MEJOR</span></div>` : '';
-          const cellStyle = isPicked ? 'background:var(--brand-100);cursor:pointer;border-radius:6px' : 'cursor:pointer';
-          return `<td class="td-num" style="${cellStyle}" data-pick-ing="${r.ing.id}" data-pick-prov="${esc(p)}"><strong>$${fmt(price)}</strong>${moqTxt}${bestBadge}</td>`;
-        }).join('');
+        const autoLabel = r.auto ? `↻ Automática (${r.auto.provider} · $${fmt(r.auto.price)})` : '↻ Automática (sin elegible)';
+        const isManual = r.sel && r.sel.source === 'manual';
+        const opts =
+          `<option value=""${isManual ? '' : ' selected'}>${esc(autoLabel)}</option>` +
+          eligible.map(q => `<option value="${q.id}"${isManual && r.sel.q.id === q.id ? ' selected' : ''}>${esc(optionLabel(q))}</option>`).join('') +
+          (ineligible.length
+            ? `<optgroup label="Incompatibles" disabled>${ineligible.map(q => `<option value="${q.id}">${esc(optionLabel(q))}</option>`).join('')}</optgroup>`
+            : '');
 
-        const selCell = r.currentPick
-          ? `<strong>${esc(r.currentPick)}</strong><div style="font-size:11px;color:var(--muted)">$${fmt(r.subtotal)} USD<br>${EternoStore.formatCop(r.subtotal, copRate)} COP</div>`
-          : `<span style="color:var(--muted)">—</span>`;
+        const selCell = qs.length
+          ? `<select data-sel="${r.ing.id}" class="inp" style="max-width:280px">${opts}</select>`
+          : '<span style="color:var(--muted);font-size:12px">Sin cotizaciones</span>';
 
-        return `<tr><td><strong>${esc(r.ing.name)}</strong><div style="font-size:11px;color:var(--muted)">${esc(r.ing.inci)}</div><div style="font-size:11px;color:var(--muted)">${ingPct}% fórmula</div></td>${provCells}<td class="td-num">${selCell}</td></tr>`;
+        const origen = r.sel
+          ? (r.sel.source === 'manual' ? '<span class="badge b-ao">manual</span>' : '<span class="badge b-carrier">↻ auto</span>')
+          : '—';
+        const minBuy = r.sel && r.sel.q.moq ? r.sel.q.price * r.sel.q.moq : null;
+
+        return `<tr>
+          <td><strong>${esc(r.ing.name)}</strong><div style="font-size:11px;color:var(--muted)">${esc(r.ing.inci)}</div></td>
+          <td class="td-num">${(r.pct * 100).toFixed(2)}%</td>
+          <td>${selCell}</td>
+          <td>${r.sel ? esc(r.sel.q.provider) : '—'}</td>
+          <td class="td-num">${r.price != null ? '$' + fmt(r.price) : '—'}</td>
+          <td class="td-num">${r.contrib != null ? '$' + fmt(r.contrib, 3) : '—'}</td>
+          <td class="td-num">${r.sel ? r.sel.q.moq + ' kg' : '—'}</td>
+          <td class="td-num">${minBuy != null ? '$' + fmt(minBuy) : '—'}</td>
+          <td>${origen}</td>
+        </tr>`;
       }).join('');
 
-      const totalProvCols = providers.map(() => '<td></td>').join('');
-      const totalRow = `<tr style="background:var(--surface2);font-weight:600"><td>TOTAL lote ${loteKg} kg</td>${totalProvCols}<td class="td-num">$${fmt(totalPicks)} USD<br><span style="font-size:11px;font-weight:400;color:var(--muted)">${EternoStore.formatCop(totalPicks, copRate)} COP</span></td></tr>`;
+      const totalRow = `<tr style="background:var(--surface2);font-weight:600">
+        <td>TOTAL MATERIA PRIMA (USD/kg fórmula)</td><td></td><td></td><td></td><td></td>
+        <td class="td-num">$${fmt(totalContrib, 3)}</td><td></td><td></td><td></td>
+      </tr>`;
 
       document.getElementById('picksTableWrap').innerHTML = `<table>${thead}<tbody>${tbodyRows}${totalRow}</tbody></table>`;
 
-      document.querySelectorAll('[data-pick-ing]').forEach(td => {
-        td.onclick = () => { EternoStore.savePick(db, td.dataset.pickIng, td.dataset.pickProv); renderAll(); };
+      document.querySelectorAll('[data-sel]').forEach(sel => {
+        sel.onchange = () => {
+          if (sel.value === '') delete db.selections[sel.dataset.sel];
+          else db.selections[sel.dataset.sel] = sel.value;
+          EternoStore.saveDb(db);
+          renderAll();
+        };
       });
 
       document.getElementById('tableNote').textContent =
-        'Click en cualquier celda de proveedor para seleccionarlo. Fondo verde = selección actual. Última sync: ' +
+        'Precios FOB en USD/kg. "↻ Automática" sigue siempre a la cotización elegible más barata; elige una específica para fijarla. Última sync: ' +
         (db.meta.updatedAt || '').replace('T', ' ').slice(0, 16);
     }
 
     function renderProviderCards() {
-      const rows = getPickRows();
+      const rows = getRows();
+      const loteKg = getLoteKg();
       const copRate = getCopRate();
       const byProv = {};
       rows.forEach(r => {
-        if (!r.currentPick || r.subtotal == null) return;
-        if (!byProv[r.currentPick]) byProv[r.currentPick] = { lines: 0, total: 0 };
-        byProv[r.currentPick].lines++;
-        byProv[r.currentPick].total += r.subtotal;
+        if (!r.sel || r.contrib == null) return;
+        const p = r.sel.q.provider;
+        if (!byProv[p]) byProv[p] = { lines: 0, total: 0 };
+        byProv[p].lines++;
+        byProv[p].total += r.contrib * loteKg;
       });
       const provs = Object.keys(byProv);
       if (!provs.length) { document.getElementById('providerCards').innerHTML = ''; return; }
@@ -380,7 +372,7 @@
           <div class="sc-sub">${byProv[p].lines} ingrediente(s) · ${EternoStore.formatCop(byProv[p].total, copRate)} COP</div>
         </div>`).join('');
       document.getElementById('providerCards').innerHTML = `
-        <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px">RESUMEN POR PROVEEDOR</h4>
+        <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px">RESUMEN POR PROVEEDOR — LOTE ${loteKg} KG</h4>
         <div style="display:flex;flex-wrap:wrap;gap:12px">${cards}
           <div class="scenario-card winner" style="flex:1;min-width:180px">
             <span class="sc-badge">Total</span><span class="sc-label">Todas las órdenes</span>
@@ -390,73 +382,48 @@
         </div>`;
     }
 
-    function renderHero() {
-      const t = totals();
-      const loteKg = getLoteKg();
-      const savePct = t.cheap > 0 ? ((t.picks - t.cheap) / t.cheap * 100) : 0;
-      const saveBadge = savePct > 0.1
-        ? `<div class="hero-delta">+${fmt(savePct, 1)}% vs el más barato posible</div>`
-        : savePct < -0.1 ? `<div class="hero-delta td-save">Selección óptima (más barato)</div>`
-        : `<div class="hero-delta">Selección = precio mínimo disponible</div>`;
-
-      document.getElementById('heroCards').innerHTML = `
-        <div class="hero-main">
-          <div class="hero-label">COGS selección actual · FOB · lote ${loteKg} kg</div>
-          <div class="hero-amount">$${fmt(t.picks * loteKg, 2)}<span> USD</span></div>
-          ${saveBadge}
-          <a class="compare-link" href="#" onclick="goImportTab();return false">Ver costo con importación →</a>
-        </div>
-        <div class="scenario-card"><span class="sc-label">Selección actual</span><div class="sc-amount">$${fmt(t.picks, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
-        <div class="scenario-card winner"><span class="sc-badge">Mínimo</span><span class="sc-label">Más barato posible</span><div class="sc-amount">$${fmt(t.cheap, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
-        <div class="scenario-card"><span class="sc-label">Selección landed</span><div class="sc-amount">$${fmt(t.picksL, 2)}</div><div class="sc-sub">según origen de proveedor</div></div>
-      `;
-    }
-
-    function renderHybrid() {
-      const rows = getPickRows();
-      const ap = allPrices();
+    function renderProcList() {
+      const rows = getRows();
       const loteKg = getLoteKg();
       const t = totals();
       const kg100 = 100 * db.settings.density / 1000;
 
-      document.getElementById('hybridTable').innerHTML = rows.map(r => {
-        const opts = r.ingProviders.map(p => `<option value="${esc(p)}"${p === r.currentPick ? ' selected' : ''}>${esc(p)} — $${fmt(ap[p][r.ing.id])}/kg</option>`).join('');
-        const noQuote = !r.ingProviders.length ? '<span style="color:var(--muted);font-size:12px">Sin cotización compatible</span>' : '';
-        const save = r.currentPick && r.cheapestProvider && r.currentPick !== r.cheapestProvider
-          ? (ap[r.cheapestProvider][r.ing.id] - ap[r.currentPick][r.ing.id]) * r.pct : 0;
-        return `<tr>
-          <td data-label="Ingrediente">${esc(r.ing.name)}</td>
-          <td data-label="Más barato" class="td-num">${r.cheapestPrice != null ? '$' + fmt(r.cheapestPrice) : '—'}</td>
-          <td data-label="Seleccionado" class="td-num">${r.pickPrice != null ? '$' + fmt(r.pickPrice) : '—'}</td>
-          <td data-label="Proveedor">${r.ingProviders.length ? `<select data-pick="${r.ing.id}" class="inp" style="width:auto">${opts}</select>` : noQuote}</td>
-          <td data-label="Δ" class="td-num ${save < -0.001 ? 'td-loss' : ''}">${save < -0.001 ? fmt(save) : '—'}</td>
-        </tr>`;
-      }).join('');
-
-      document.querySelectorAll('[data-pick]').forEach(sel => {
-        sel.onchange = () => { EternoStore.savePick(db, sel.dataset.pick, sel.value); renderAll(); };
-      });
-
       document.getElementById('procList').innerHTML = rows
-        .filter(r => r.currentPick && r.subtotal != null)
-        .sort((a, b) => (b.subtotal ?? 0) - (a.subtotal ?? 0))
-        .map(r => `<li><span><span class="badge b-carrier">${esc(r.currentPick)}</span> ${esc(r.ing.name)}</span><span class="td-num">$${fmt(r.subtotal)} / ${loteKg}kg</span></li>`).join('');
+        .filter(r => r.sel && r.contrib != null)
+        .sort((a, b) => (b.contrib ?? 0) - (a.contrib ?? 0))
+        .map(r => `<li><span><span class="badge b-carrier">${esc(r.sel.q.provider)}</span> ${esc(r.ing.name)}</span><span class="td-num">$${fmt(r.contrib * loteKg)} / ${loteKg}kg</span></li>`).join('');
 
       document.getElementById('procTotal').innerHTML =
-        `COGS MP por 100 ml (FOB): <strong>$${fmt(t.picks * kg100)}</strong> — <a href="#" onclick="goImportTab();return false">calcular con importación</a>`;
+        `Costo MP por 100 ml (FOB): <strong>$${fmt(t.sel * kg100)}</strong> — <a href="#" onclick="goImportTab();return false">calcular con importación</a>`;
+    }
+
+    function renderHero() {
+      const t = totals();
+      const loteKg = getLoteKg();
+      document.getElementById('heroCards').innerHTML = `
+        <div class="hero-main">
+          <div class="hero-label">Costo MP actual · FOB · lote ${loteKg} kg</div>
+          <div class="hero-amount">$${fmt(t.sel * loteKg, 2)}<span> USD</span></div>
+          <div class="hero-delta">$${fmt(t.sel, 2)} USD / kg fórmula</div>
+          <a class="compare-link" href="#" onclick="goImportTab();return false">Ver costo con importación →</a>
+        </div>
+        <div class="scenario-card winner"><span class="sc-badge">Mínimo</span><span class="sc-label">Costo si todo al mínimo</span><div class="sc-amount">$${fmt(t.auto, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
+        <div class="scenario-card"><span class="sc-label">Ahorro potencial</span><div class="sc-amount">$${fmt(Math.max(t.saving, 0), 2)}</div><div class="sc-sub">${t.saving > 0.005 ? 'volviendo todo a automático' : 'ya estás en el mínimo'}</div></div>
+        <div class="scenario-card"><span class="sc-label">Cobertura</span><div class="sc-amount">${t.eligibleCount}/${db.formula.length}</div><div class="sc-sub">ingredientes con cotización elegible</div></div>
+      `;
     }
 
     function renderImport() {
       const t = totals();
       document.getElementById('importMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">Picks FOB</div><div class="metric-value">$${fmt(t.picks)}</div><div class="metric-sub">USD / kg</div></div>
-        <div class="metric"><div class="metric-label">Picks landed</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL)}</div><div class="metric-sub">China ${db.settings.importMarkupChina}% · Local ${db.settings.importMarkupLocal}%</div></div>
-        <div class="metric"><div class="metric-label">Extra import</div><div class="metric-value">$${fmt(t.picksL - t.picks)}</div><div class="metric-sub">por kg de fórmula</div></div>
-        <div class="metric"><div class="metric-label">100 ml landed</div><div class="metric-value">$${fmt(t.picksL * 0.1 * db.settings.density)}</div><div class="metric-sub">solo MP</div></div>
+        <div class="metric"><div class="metric-label">Selección FOB</div><div class="metric-value">$${fmt(t.sel)}</div><div class="metric-sub">USD / kg</div></div>
+        <div class="metric"><div class="metric-label">Selección landed</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.selL)}</div><div class="metric-sub">China ${db.settings.importMarkupChina}% · Local ${db.settings.importMarkupLocal}%</div></div>
+        <div class="metric"><div class="metric-label">Extra import</div><div class="metric-value">$${fmt(t.selL - t.sel)}</div><div class="metric-sub">por kg de fórmula</div></div>
+        <div class="metric"><div class="metric-label">100 ml landed</div><div class="metric-value">$${fmt(t.selL * 0.1 * db.settings.density)}</div><div class="metric-sub">solo MP</div></div>
       `;
       document.getElementById('importTable').innerHTML = [
-        { n: 'Más barato posible', f: t.cheap, l: t.cheapL },
-        { n: 'Selección actual', f: t.picks, l: t.picksL },
+        { n: 'Más barato posible', f: t.auto, l: t.autoL },
+        { n: 'Selección actual', f: t.sel, l: t.selL },
       ].map(r => `<tr><td data-label="Escenario"><strong>${r.n}</strong></td><td data-label="FOB" class="td-num">$${fmt(r.f)}</td><td data-label="Landed" class="td-num">$${fmt(r.l)}</td><td data-label="Extra" class="td-num">+$${fmt(r.l - r.f)}</td></tr>`).join('');
     }
 
@@ -474,17 +441,17 @@
       const pack = +document.getElementById('packCost').value || 0;
       const vari = +document.getElementById('varCost').value || 0;
       const kg = 0.1 * db.settings.density;
-      const cogsUnit = t.picksL * kg;
-      const totalCost = cogsUnit + pack + vari;
-      const margin = retail - totalCost;
+      const mpUnit = t.selL * kg;
+      const cogsUnit = mpUnit + pack + vari; // COGS = MP + empaque + variables
+      const margin = retail - cogsUnit;
       const marginPct = retail > 0 ? (margin / retail * 100) : 0;
-      const cheapUnit = t.cheapL * kg;
+      const cheapUnit = t.autoL * kg;
       const marginCheap = retail - (cheapUnit + pack + vari);
       const extraVsCheap = margin - marginCheap;
       document.getElementById('marginMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">Costo total / 100 ml</div><div class="metric-value">$${fmt(totalCost)}</div><div class="metric-sub">MP (landed) + empaque + variable</div></div>
+        <div class="metric"><div class="metric-label">COGS / 100 ml</div><div class="metric-value">$${fmt(cogsUnit)}</div><div class="metric-sub">MP (landed) + empaque + variable</div></div>
         <div class="metric"><div class="metric-label">Margen bruto / unidad</div><div class="metric-value" style="color:${margin >= 0 ? 'var(--accent)' : 'var(--err)'}">$${fmt(margin)}</div><div class="metric-sub">${fmt(marginPct, 1)}% sobre PVP $${fmt(retail)}</div></div>
-        <div class="metric"><div class="metric-label">MP sola (landed)</div><div class="metric-value">$${fmt(cogsUnit)}</div><div class="metric-sub">${(kg * 1000).toFixed(0)} g por unidad</div></div>
+        <div class="metric"><div class="metric-label">MP sola (landed)</div><div class="metric-value">$${fmt(mpUnit)}</div><div class="metric-sub">${(kg * 1000).toFixed(0)} g por unidad</div></div>
         <div class="metric"><div class="metric-label">Δ vs más barato posible</div><div class="metric-value" style="color:${extraVsCheap >= 0 ? 'var(--muted)' : 'var(--err)'}">$${fmt(extraVsCheap)}</div><div class="metric-sub">diferencia de margen por unidad</div></div>
       `;
     }
@@ -494,51 +461,53 @@
       const kg = batchMl * db.settings.density / 1000;
       document.getElementById('batchMetrics').innerHTML = `
         <div class="metric"><div class="metric-label">Lote ${batchMl} ml</div><div class="metric-value">${kg.toFixed(3)} kg</div><div class="metric-sub">Densidad ${db.settings.density} g/ml</div></div>
-        <div class="metric"><div class="metric-label">Selección actual FOB</div><div class="metric-value">$${fmt(t.picks * kg)}</div><div class="metric-sub">Δ $${fmt((t.picks - t.cheap) * kg)} vs mínimo</div></div>
-        <div class="metric"><div class="metric-label">Más barato posible</div><div class="metric-value">$${fmt(t.cheap * kg)}</div><div class="metric-sub">mismo volumen</div></div>
-        <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.picksL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">según proveedor · ajustar</a></div></div>
+        <div class="metric"><div class="metric-label">Selección actual FOB</div><div class="metric-value">$${fmt(t.sel * kg)}</div><div class="metric-sub">Δ $${fmt((t.sel - t.auto) * kg)} vs mínimo</div></div>
+        <div class="metric"><div class="metric-label">Más barato posible</div><div class="metric-value">$${fmt(t.auto * kg)}</div><div class="metric-sub">mismo volumen</div></div>
+        <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.selL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">según proveedor · ajustar</a></div></div>
       `;
-      const max = Math.max(t.cheap * kg, t.picks * kg, 0.0001);
+      const max = Math.max(t.auto * kg, t.sel * kg, 0.0001);
       document.getElementById('batchBars').innerHTML = `
-        <div class="bar-row"><span class="bar-label">Más barato</span><span class="bar-track"><span class="bar-fill" style="width:${(t.cheap * kg / max * 100).toFixed(1)}%;background:var(--bar-cheap)"></span></span><span class="bar-val">$${fmt(t.cheap * kg)}</span></div>
-        <div class="bar-row"><span class="bar-label">Selección actual</span><span class="bar-track"><span class="bar-fill" style="width:${(t.picks * kg / max * 100).toFixed(1)}%;background:var(--bar-picks)"></span></span><span class="bar-val">$${fmt(t.picks * kg)}</span></div>
+        <div class="bar-row"><span class="bar-label">Más barato</span><span class="bar-track"><span class="bar-fill" style="width:${(t.auto * kg / max * 100).toFixed(1)}%;background:var(--bar-cheap)"></span></span><span class="bar-val">$${fmt(t.auto * kg)}</span></div>
+        <div class="bar-row"><span class="bar-label">Selección actual</span><span class="bar-track"><span class="bar-fill" style="width:${(t.sel * kg / max * 100).toFixed(1)}%;background:var(--bar-picks)"></span></span><span class="bar-val">$${fmt(t.sel * kg)}</span></div>
       `;
     }
 
-    // ── Riesgos data-driven ─────────────────────────────────────────────
-    function computeRisks() {
-      const risks = [];
-      Object.keys(db.picks || {}).forEach(ingId => {
-        const prov = db.picks[ingId];
-        if (!prov) return;
-        const q = db.quotations.find(x => x.provider === prov && x.ingId === ingId);
-        if (q && EternoStore.isExpired(q)) {
-          const ing = db.formula.find(i => i.id === ingId);
-          risks.push({ type: 'err', title: `${ing?.name || ingId} — cotización vencida`, text: `El pick actual (${prov}) venció el ${q.validUntil}. Actualiza la cotización o cambia de proveedor.` });
+    // ── Alertas generadas desde datos ──────────────────────────────────────
+    function computeAlerts() {
+      const alerts = [];
+      db.formula.forEach(ing => {
+        const sel = EternoStore.getSelected(db, ing.id);
+        const auto = EternoStore.autoPick(db, ing.id);
+
+        if (!auto) {
+          alerts.push({ type: 'err', title: `${ing.name} — sin cotización elegible`, text: 'Ninguna cotización compatible y vigente. Bloquea la orden de compra.' });
+        }
+        if (!sel) return;
+        const q = sel.q;
+
+        if (sel.source === 'manual' && q.compat === 'no') {
+          alerts.push({ type: 'err', title: `${ing.name} — selección manual incompatible`, text: `La selección apunta a ${q.provider}, marcada como incompatible con base anhidra. Cámbiala.` });
+        }
+        if (q.spec === 'pending' || q.spec === 'warn') {
+          alerts.push({ type: 'warn', title: `${ing.name} — spec sin confirmar (${q.provider})`, text: q.spec === 'pending' ? 'La hoja de especificación está pendiente de validar.' : 'La especificación tiene observaciones. Revisar antes de comprar.' });
+        }
+        if (q.unitWarning) {
+          alerts.push({ type: 'warn', title: `${ing.name} — unidad ≠ kg (${q.provider})`, text: 'El precio no está normalizado a USD/kg; el costo mostrado no es confiable.' });
+        }
+        if (sel.source === 'manual' && auto && auto.id !== q.id && auto.price > 0 && q.price > auto.price * 1.2) {
+          const overPct = ((q.price / auto.price - 1) * 100).toFixed(0);
+          alerts.push({ type: 'info', title: `${ing.name} — selección manual ${overPct}% más cara`, text: `${q.provider} a $${fmt(q.price)}/kg vs ${auto.provider} a $${fmt(auto.price)}/kg en automático.` });
         }
       });
-      EternoStore.getMissingIngredients(db).forEach(ing => {
-        risks.push({ type: 'err', title: `${ing.name} — sin cotización compatible`, text: 'Bloquea la orden de compra. Agrega una cotización cuanto antes.' });
-      });
-      db.formula.forEach(ing => {
-        const compatQs = db.quotations.filter(q => q.ingId === ing.id && q.compat === 'yes' && q.status !== 'obsoleto — fuera de fórmula');
-        const incompatQs = db.quotations.filter(q => q.ingId === ing.id && q.compat === 'no' && q.status !== 'obsoleto — fuera de fórmula');
-        if (!compatQs.length || !incompatQs.length) return;
-        const cheapestCompat = Math.min(...compatQs.map(q => q.price));
-        incompatQs.filter(q => q.price < cheapestCompat).forEach(q => {
-          risks.push({ type: 'warn', title: `${ing.name} — ${q.provider} es más barato pero incompatible`, text: q.notes || 'Revisar especificación antes de decidir solo por precio.' });
-        });
-      });
-      if (EternoStore.shouldShowBackupReminder(db)) {
-        risks.push({ type: 'info', title: 'Respaldo pendiente', text: `No exportas un respaldo hace más de ${EternoStore.BACKUP_REMINDER_DAYS} días.` });
+      if (!alerts.length) {
+        alerts.push({ type: 'ok', title: 'Sin riesgos detectados', text: 'Todas las selecciones son elegibles, con spec confirmada y sin sobrecosto relevante.' });
       }
-      risks.push({ type: 'ok', title: 'Regla de negocio recomendada', text: 'Activos críticos y specs únicas: proveedor con mejor spec · Carriers commodity: proveedor más barato compatible.' });
-      return risks;
+      return alerts;
     }
 
     function renderAlerts() {
-      const risks = computeRisks();
-      document.getElementById('alertsBody').innerHTML = risks.map(a => `
+      const alerts = computeAlerts();
+      document.getElementById('alertsBody').innerHTML = alerts.map(a => `
         <div class="banner banner-${a.type === 'err' ? 'err' : a.type}">
           <div><div class="banner-title">${esc(a.title)}</div><div>${esc(a.text)}</div></div>
         </div>`).join('');
@@ -550,7 +519,7 @@
       renderIngredientCards();
       renderPicksTable();
       renderProviderCards();
-      renderHybrid();
+      renderProcList();
       renderMargin();
       renderAlerts();
       renderMissingBanner();
@@ -634,28 +603,16 @@
       const el = document.getElementById('missingBanner');
       if (!missing.length) { el.innerHTML = ''; return; }
       el.innerHTML = `<div class="banner banner-warn">
-        <div><div class="banner-title">⚠ Ingredientes SIN cotización compatible — bloquean el pedido</div>
+        <div><div class="banner-title">⚠ Ingredientes SIN cotización elegible — bloquean el pedido</div>
         ${missing.map(i => `<a class="badge b-warn" style="margin:2px" href="quotation_tracker.html?add=${encodeURIComponent(i.id)}">${esc(i.name)}</a>`).join(' ')}</div>
       </div>`;
     }
 
-    document.getElementById('btnAutoCheapest').onclick = () => {
-      const ap = allPrices();
-      const providers = Object.keys(ap);
-      if (!db.picks) db.picks = {};
-      db.formula.forEach(ing => {
-        const ingProviders = providers.filter(p => ap[p][ing.id] != null);
-        if (!ingProviders.length) return;
-        const cheapest = ingProviders.reduce((best, p) => {
-          const lp  = EternoStore.landedPrice(ap[p][ing.id], p, db.settings);
-          const blp = EternoStore.landedPrice(ap[best][ing.id], best, db.settings);
-          return lp < blp ? p : best;
-        });
-        db.picks[ing.id] = cheapest;
-      });
+    document.getElementById('btnAllAuto').onclick = () => {
+      db.selections = {};
       EternoStore.saveDb(db);
       renderAll();
-      EternoStore.toast('Seleccionado más barato por costo landed');
+      EternoStore.toast('Todos los ingredientes volvieron a selección automática');
     };
 
     bindControls();

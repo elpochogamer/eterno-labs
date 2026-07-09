@@ -179,9 +179,9 @@
       const draft  = db.poDraft.lines[ing.id] || {};
       const quotes = quotesFor(ing.id, onlyCompat);
       let qid = draft.qid;
-      if (!qid && db.picks?.[ing.id]) {
-        const pickQ = quotes.find(q => q.provider === db.picks[ing.id]);
-        if (pickQ) qid = pickQ.id;
+      if (!qid) {
+        const sel = EternoStore.getSelected(db, ing.id);
+        if (sel && quotes.find(q => q.id === sel.q.id)) qid = sel.q.id;
       }
       if (!quotes.find(q => q.id === qid)) qid = quotes[0] ? quotes[0].id : null;
       const quote = quotes.find(q => q.id === qid) || null;
@@ -362,8 +362,8 @@
       if (e.target.classList.contains('sel-prov')) {
         d.qid = e.target.value;
         d.qty = null;
-        const q = db.quotations.find(x => x.id === d.qid);
-        if (q) EternoStore.savePick(db, ingId, q.provider);
+        // Sincroniza la selección global v7 con lo elegido en la orden
+        if (db.quotations.find(x => x.id === d.qid)) db.selections[ingId] = d.qid;
       }
       if (e.target.classList.contains('qty')) {
         d.qty = Math.max(0, Number(e.target.value) || 0);

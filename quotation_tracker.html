@@ -301,11 +301,12 @@
         const st = EternoStore.quotationStateBadge(q);
         const spec = SPEC_BADGE[q.spec] || SPEC_BADGE.pending;
         const landed = EternoStore.landedPrice(q.price, q.provider, db.settings);
-        const isPick = db.picks && db.picks[q.ingId] === q.provider;
+        const sel = EternoStore.getSelected(db, q.ingId);
+        const isPick = !!sel && sel.q.id === q.id;
         const curBadge = q.currencyOriginal === 'COP' ? badge('b-ao', 'COP') : badge('b-carrier', 'USD');
         return `<tr class="${isPick ? 'row-pick' : ''}">
           <td data-label="Ingrediente"><strong>${esc(ing ? ing.name : q.ingId)}</strong><div class="ghost">${esc(ing ? ing.inci : '')}</div></td>
-          <td data-label="Proveedor">${esc(q.provider)} ${isPick ? '<span class="badge b-ok" style="margin-left:4px">Pick</span>' : ''}</td>
+          <td data-label="Proveedor">${esc(q.provider)} ${isPick ? `<span class="badge b-ok" style="margin-left:4px">${sel.source === 'manual' ? 'Selección' : '↻ Selección auto'}</span>` : ''}</td>
           <td data-label="Moneda" style="text-align:center">${curBadge}</td>
           <td data-label="USD/kg" class="td-num">$${Number(q.price).toFixed(2)}</td>
           <td data-label="Landed" class="td-num">$${landed.toFixed(2)}</td>
