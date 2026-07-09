@@ -1,12 +1,13 @@
 /**
- * Eterno — capa de persistencia local (localStorage) v3
+ * Eterno — capa de persistencia local (localStorage)
  * Fórmula 13 ingredientes · FX 3650 COP/USD · moneda normalizada
  * Directorio de proveedores, vencimientos, lead time, COA, respaldo.
+ * v7: selección por cotización (db.selections = { ingId: quotationId }).
  */
 (function (global) {
   'use strict';
   const DB_KEY         = 'eterno_database_v1';
-  const SCHEMA         = 6;
+  const SCHEMA         = 7;
   const DEFAULT_BATCH_G = 445;
   const DEFAULT_FX_RATE = 3650;
   const CURRENCIES      = ['COP', 'USD'];
@@ -32,13 +33,6 @@
   // Total = 100.00 %
 
   const OBSOLETE_IDS = new Set(['oleic', 'baku']);
-
-  // Picks por defecto para la nueva fórmula
-  const DEFAULT_PICKS = {
-    cct:'P1 China', hemisq:null, squalane:'P1 China', grapeseed:'P2 Imagen',
-    rice:'P2 Imagen', saw:'P1 China', iso:'P1 China', ginseng:'Laboratorios Phitother S.A.S',
-    rosemary:'P1 China', melatonin:null, toco:'P2 Imagen', ascpal:null, mentha:'P2 Imagen',
-  };
 
   // ── Cotizaciones seed — precio siempre en USD; COP normalizado en migrate() ─
   const DEFAULT_QUOTATIONS = [
@@ -289,12 +283,58 @@
     return !!(q.unit && q.unit !== 'kg');
   }
 
-  function isUsable(q) {
+  // Elegible para selección/auto-pick. Además de lo pedido por el motor v7
+  // (compat, unitWarning, descartado) excluye obsoletas y vencidas — mantiene
+  // la promesa del tracker: "Vencidas — excluidas del auto-pick".
+  function isEligible(q) {
     return q.compat !== 'no' &&
            q.status !== 'obsoleto — fuera de fórmula' &&
            q.status !== 'descartado' &&
            !q.unitWarning &&
            !isExpired(q);
+  }
+  const isUsable = isEligible; // alias legado
+
+  // ── Motor de selección v7 ────────────────────────────────────────────────
+  // Ordena por precio FOB crudo: el recargo de importación NO participa aquí;
+  // solo se aplica en las vistas landed (pestaña Importación, Margen, etc.).
+  function autoPick(db, ingId) {
+    const qs = db.quotations.filter(q => q.ingId === ingId && isEligible(q));
+    if (!qs.length) return null;
+    const specRank = s => ({ ok: 0, pending: 1, warn: 2 }[s] ?? 3);
+    return qs.slice().sort((a, b) =>
+      a.price - b.price ||
+      specRank(a.spec) - specRank(b.spec) ||
+      (a.moq ?? Infinity) - (b.moq ?? Infinity)
+    )[0];
+  }
+
+  function getSelected(db, ingId) {
+    const id = db.selections?.[ingId];
+    if (id) {
+      const q = db.quotations.find(x => x.id === id);
+      if (q) return { q, source: 'manual' };
+    }
+    const q = autoPick(db, ingId);
+    return q ? { q, source: 'auto' } : null;
+  }
+
+  function pruneSelections(db) {
+    if (!db.selections) { db.selections = {}; return []; }
+    const live = new Set(db.quotations.map(q => q.id));
+    const dead = Object.entries(db.selections)
+      .filter(([, qid]) => !live.has(qid))
+      .map(([ingId]) => ingId);
+    dead.forEach(ingId => delete db.selections[ingId]);
+    return dead; // el caller muestra toast si dead.length
+  }
+
+  function wipeQuotations(db) {
+    db.quotations = [];
+    db.selections = {};
+    // Borrador de PO apuntaba a quotationIds que ya no existen
+    db.poDraft = { batchSizeG: db.poDraft?.batchSizeG || DEFAULT_BATCH_G, lines: {} };
+    return db; // formula y settings intactos
   }
 
   function getUnitWarningQuotations(db) {
@@ -334,11 +374,9 @@
         safetyMarginPct: 10,
         importMarkupChina: 30,
         importMarkupLocal: 0,
-        supplierP1: 'P1 China',
-        supplierP2: 'P2 Imagen',
         lastBackupAt: null,
       },
-      picks: { ...DEFAULT_PICKS },
+      selections: {},
       purchaseOrders: [],
       poDraft: { batchSizeG: DEFAULT_BATCH_G, lines: {} },
     };
@@ -347,9 +385,13 @@
   }
 
   // ── migrate ──────────────────────────────────────────────────────────────
-  function migrate(db) {
+  // Regla dura: nunca mutar el objeto recibido — se clona primero y solo
+  // entonces se evalúa la versión. Idempotente: v7+ retorna sin tocar nada.
+  function migrate(input) {
+    if (!input || typeof input !== 'object') return defaultDb();
+    const db = structuredClone(input);
+    if (db.version >= SCHEMA) return db;
     const base = defaultDb();
-    if (!db || typeof db !== 'object') return base;
 
     const fromV1 = !db.version || db.version < 2;
     const fromV3 = !db.version || db.version < 4;
@@ -383,8 +425,10 @@
     const fxRate   = db.settings.fxRate || DEFAULT_FX_RATE;
     const validIds = new Set(FORMULA_INGREDIENTS.map(i => i.id));
 
-    // Quotations
-    if (!Array.isArray(db.quotations) || db.quotations.length === 0) {
+    // Quotations. Seed SOLO si no es array (DB nueva/corrupta): un array
+    // vacío es un estado válido (p.ej. tras "Vaciar cotizaciones") y se
+    // respeta — nunca reinyectar DEFAULT_QUOTATIONS sobre un vaciado.
+    if (!Array.isArray(db.quotations)) {
       db.quotations = base.quotations;
     } else {
       db.quotations = db.quotations.map(q => {
@@ -485,7 +529,8 @@
       });
     });
 
-    // Picks: migrate hybrid → picks, remove obsolete, add new ingredients
+    // v7: selección por cotización. Cadena legacy: hybrid (p1/p2) → picks
+    // (proveedor) → selections (quotationId). supplierP1/P2 solo viven aquí.
     const oldHybrid = db.hybrid || {};
     const p1Name    = db.settings.supplierP1 || 'P1 China';
     const p2Name    = db.settings.supplierP2 || 'P2 Imagen';
@@ -499,18 +544,44 @@
         }
       });
     }
-    // Remove picks for eliminated/unknown ingredients
-    Object.keys(db.picks).forEach(k => { if (!validIds.has(k)) delete db.picks[k]; });
-    // Ensure all formula ingredients have a picks entry
-    FORMULA_INGREDIENTS.forEach(ing => {
-      if (!(ing.id in db.picks)) db.picks[ing.id] = DEFAULT_PICKS[ing.id] || null;
+
+    // picks → selections: la cotización más barata elegible del proveedor
+    // pickeado. Si el pick coincide con lo que autoPick elegiría de todas
+    // formas, se deja en automático (no se congela como "manual").
+    db.selections = (db.selections && typeof db.selections === 'object') ? db.selections : {};
+    Object.keys(db.picks).forEach(ingId => {
+      if (!validIds.has(ingId) || db.selections[ingId]) return;
+      const prov = db.picks[ingId];
+      if (!prov) return;
+      const auto = autoPick(db, ingId);
+      if (auto && auto.provider === prov) return;
+      const best = db.quotations
+        .filter(q => q.ingId === ingId && q.provider === prov && isEligible(q))
+        .sort((a, b) => a.price - b.price)[0];
+      if (best) db.selections[ingId] = best.id;
     });
+    Object.keys(db.selections).forEach(k => { if (!validIds.has(k)) delete db.selections[k]; });
+
+    delete db.picks;
+    delete db.hybrid;
+    delete db.manualPrices;
+    delete db.settings.supplierP1;
+    delete db.settings.supplierP2;
 
     db.version = SCHEMA;
     return db;
   }
 
   // ── loadDb / saveDb ──────────────────────────────────────────────────────
+  // Selecciones limpiadas en el último loadDb (apuntaban a cotizaciones ya
+  // inexistentes). La página las consume una vez para avisar con toast.
+  let prunedIngIds = [];
+  function consumePrunedSelections() {
+    const out = prunedIngIds;
+    prunedIngIds = [];
+    return out;
+  }
+
   function loadDb() {
     try {
       const raw = localStorage.getItem(DB_KEY);
@@ -522,7 +593,9 @@
       const db = JSON.parse(raw);
       const originalVersion = db.version;
       const migrated = migrate(db);
-      if (!originalVersion || originalVersion < SCHEMA) saveDb(migrated);
+      const dead = pruneSelections(migrated);
+      if (dead.length) prunedIngIds = dead;
+      if (!originalVersion || originalVersion < SCHEMA || dead.length) saveDb(migrated);
       return migrated;
     } catch (e) {
       console.warn('Eterno DB load error', e);
@@ -561,27 +634,9 @@
     return db.formula;
   }
 
-  // Precios por proveedor (solo compatibles, no vencidos, excluye obsoletos, solo ing de fórmula activa)
-  function getPricesFromQuotations(db) {
-    const formulaIds = new Set(db.formula.map(i => i.id));
-    const result = {};
-    db.quotations
-      .filter(q => isUsable(q) && q.ingId && formulaIds.has(q.ingId))
-      .forEach(q => {
-        if (!result[q.provider]) result[q.provider] = {};
-        if (result[q.provider][q.ingId] == null || q.price < result[q.provider][q.ingId]) {
-          result[q.provider][q.ingId] = q.price;
-        }
-      });
-    return result;
-  }
-
-  // Ingredientes sin cotización compatible en la fórmula activa
+  // Ingredientes sin ninguna cotización seleccionable (ni manual ni elegible)
   function getMissingIngredients(db) {
-    const ap = getPricesFromQuotations(db);
-    const covered = new Set();
-    Object.values(ap).forEach(provMap => Object.keys(provMap).forEach(id => covered.add(id)));
-    return db.formula.filter(ing => !covered.has(ing.id));
+    return db.formula.filter(ing => !getSelected(db, ing.id));
   }
 
   function getQuotations(db, opts) {
@@ -590,16 +645,6 @@
     if (opts.soloCompatibles) list = list.filter(isUsable);
     if (opts.ingId) list = list.filter(q => q.ingId === opts.ingId);
     return list;
-  }
-
-  function getPicks(db) {
-    return db.picks || {};
-  }
-
-  function savePick(db, ingId, providerName) {
-    if (!db.picks) db.picks = {};
-    db.picks[ingId] = providerName;
-    saveDb(db);
   }
 
   function getSettings(db) {
@@ -690,6 +735,7 @@
 
   function deleteQuotation(db, id) {
     db.quotations = db.quotations.filter(q => q.id !== id);
+    pruneSelections(db); // si era la seleccionada, ese ingrediente vuelve a auto
     saveDb(db);
   }
 
@@ -723,7 +769,8 @@
     if (!obj || typeof obj !== 'object') return null;
     return {
       quotations: Array.isArray(obj.quotations) ? obj.quotations.length : 0,
-      picks: obj.picks ? Object.keys(obj.picks).length : 0,
+      selections: obj.selections ? Object.keys(obj.selections).length
+                : obj.picks ? Object.keys(obj.picks).length : 0,
       suppliers: Array.isArray(obj.suppliers) ? obj.suppliers.length : 0,
       date: obj.meta?.updatedAt || null,
       version: obj.version || 1,
@@ -752,7 +799,8 @@
             const supIds = new Set(db.suppliers.map(s => s.id));
             (incoming.suppliers || []).forEach(s => { if (!supIds.has(s.id)) db.suppliers.push(s); });
             db.settings     = { ...db.settings, ...incoming.settings };
-            db.picks        = { ...db.picks, ...incoming.picks };
+            db.selections   = { ...db.selections, ...incoming.selections };
+            pruneSelections(db);
           } else {
             db = incoming;
           }
@@ -816,13 +864,13 @@
 
   // ── API pública ──────────────────────────────────────────────────────────
   global.EternoStore = {
-    DB_KEY, SCHEMA, FORMULA_INGREDIENTS, OBSOLETE_IDS, DEFAULT_PICKS,
+    DB_KEY, SCHEMA, FORMULA_INGREDIENTS, OBSOLETE_IDS,
     DEFAULT_FX_RATE, DEFAULT_BATCH_G, CURRENCIES, UNITS, BACKUP_REMINDER_DAYS,
     SUPPLIER_ALIASES, resolveSupplierAlias,
-    loadDb, saveDb, defaultDb, migrate,
+    loadDb, saveDb, defaultDb, migrate, consumePrunedSelections,
     sumPct, pctFactor, nameToId, getIngredient, getFormula,
-    getPricesFromQuotations, getMissingIngredients, getQuotations,
-    getPicks, savePick, setPick: savePick,
+    getMissingIngredients, getQuotations,
+    isEligible, autoPick, getSelected, pruneSelections, wipeQuotations,
     getSettings, updateSettings,
     addQuotation, updateQuotation, deleteQuotation, validateQuotationInput,
     getSuppliers, addSupplier, updateSupplier, matchOrCreateSupplier, findSupplierByName,

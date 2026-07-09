@@ -102,7 +102,7 @@
       return;
     }
     const message =
-      `Este respaldo contiene ${summary.quotations} cotización(es), ${summary.picks} selección(es) y ${summary.suppliers} proveedor(es).\n` +
+      `Este respaldo contiene ${summary.quotations} cotización(es), ${summary.selections} selección(es) y ${summary.suppliers} proveedor(es).\n` +
       `Versión: ${summary.version} · Fecha: ${summary.date ? new Date(summary.date).toLocaleString('es-CO') : 'desconocida'}.\n\n` +
       `Se fusionará con tus datos actuales (nada se reemplaza).`;
     const ok = await EternoStore.confirmDialog({
