@@ -53,21 +53,23 @@
   <script src="./eterno-nav.js"></script>
   <script>
     const db = EternoStore.loadDb();
+    const pruned = EternoStore.consumePrunedSelections();
+    if (pruned.length) EternoStore.toast(`${pruned.length} selección(es) volvieron a automático (cotización eliminada)`);
     const total  = EternoStore.sumPct(db);
     const factor = EternoStore.pctFactor(db);
-    const ap = EternoStore.getPricesFromQuotations(db);
-    const providers = Object.keys(ap);
-    const covered = db.formula.filter(ing => providers.some(p => ap[p][ing.id] != null)).length;
     const missing = EternoStore.getMissingIngredients(db);
 
     const esc = EternoStore.esc;
 
+    let covered = 0;
     let cogsPerKg = 0;
     db.formula.forEach(ing => {
-      const pct  = (ing.pct / 100) * factor;
-      const pick = db.picks?.[ing.id];
-      const pr   = (pick && ap[pick]) ? ap[pick][ing.id] : null;
-      if (pr != null) cogsPerKg += pct * EternoStore.landedPrice(pr, pick, db.settings);
+      const pct = (ing.pct / 100) * factor;
+      const sel = EternoStore.getSelected(db, ing.id);
+      if (sel) {
+        covered++;
+        cogsPerKg += pct * EternoStore.landedPrice(sel.q.price, sel.q.provider, db.settings);
+      }
     });
     const batchKg = (db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G) / 1000;
     const batchCost = cogsPerKg * batchKg;

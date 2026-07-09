@@ -14,7 +14,7 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">Aceite Capilar — Fórmula Definitiva</h1>
-        <p class="page-sub">13 ingredientes activos · proceso 100% lipofílico · costo en vivo según los picks actuales de proveedor.</p>
+        <p class="page-sub">13 ingredientes activos · proceso 100% lipofílico · costo en vivo según la selección actual de cotizaciones.</p>
       </div>
       <div class="toolbar">
         <div class="control-group">
@@ -60,6 +60,10 @@
   <script src="./eterno-nav.js"></script>
   <script>
     let db = EternoStore.loadDb();
+    {
+      const pruned = EternoStore.consumePrunedSelections();
+      if (pruned.length) EternoStore.toast(`${pruned.length} selección(es) volvieron a automático (cotización eliminada)`);
+    }
 
     const esc = EternoStore.esc;
     const fmt = EternoStore.fmt;
@@ -91,7 +95,6 @@
     function render() {
       const batchG = getBatchG();
       const factor = EternoStore.pctFactor(db);
-      const ap = EternoStore.getPricesFromQuotations(db);
       const missing = EternoStore.getMissingIngredients(db);
       const missingIds = new Set(missing.map(i => i.id));
 
@@ -100,9 +103,8 @@
       let coveredCount = 0;
       const rowsHtml = db.formula.map(ing => {
         const grams = EternoStore.gramsForBatch(ing.pct * factor, batchG);
-        const pick = db.picks?.[ing.id];
-        const priceKg = (pick && ap[pick]) ? ap[pick][ing.id] : null;
-        const landedKg = priceKg != null ? EternoStore.landedPrice(priceKg, pick, db.settings) : null;
+        const sel = EternoStore.getSelected(db, ing.id);
+        const landedKg = sel ? EternoStore.landedPrice(sel.q.price, sel.q.provider, db.settings) : null;
         const lineCost = landedKg != null ? landedKg * grams / 1000 : null;
         if (lineCost != null) { batchTotal += lineCost; coveredCount++; }
 
@@ -139,7 +141,7 @@
         <div class="metric"><div class="metric-label">Ingredientes activos</div><div class="metric-value">${db.formula.length}</div><div class="metric-sub">${coveredCount}/${db.formula.length} con costo</div></div>
         <div class="metric"><div class="metric-label">Lote de referencia</div><div class="metric-value">${batchG} g</div><div class="metric-sub">editable arriba</div></div>
         <div class="metric"><div class="metric-label">Suma de fórmula</div><div class="metric-value">${total.toFixed(2)}%</div><div class="metric-sub">${Math.abs(total - 100) < 0.01 ? 'exacta' : 'normalizada por factor'}</div></div>
-        <div class="metric"><div class="metric-label">Costo total del lote</div><div class="metric-value">$${fmt(batchTotal)}</div><div class="metric-sub">según picks actuales</div></div>
+        <div class="metric"><div class="metric-label">Costo total del lote</div><div class="metric-value">$${fmt(batchTotal)}</div><div class="metric-sub">según selección actual</div></div>
       `;
 
       const el = document.getElementById('missingNote');
