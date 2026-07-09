@@ -731,3 +731,26 @@ input[type="file"] { display: none; }
   .tabs { width: 100%; border-radius: var(--radius-lg); }
   .app-nav { flex-direction: column; align-items: stretch; }
 }
+
+/* ── Glosario de términos (eterno-terms.js) ─────────────────────────────── */
+.term {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.term-popover {
+  position: absolute;
+  z-index: 300;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.term-popover[hidden] { display: none; }

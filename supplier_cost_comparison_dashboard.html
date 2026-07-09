@@ -41,7 +41,7 @@
         <input type="number" id="copRateD" min="1" step="50" style="width:110px">
       </div>
       <div class="control-group">
-        <label>PVP referencia</label>
+        <label><span class="term" data-term="pvp">PVP</span> referencia</label>
         <input type="number" id="retailPrice" min="1" step="0.5" value="28" style="width:80px">
         <span class="note" style="margin:0">USD / 100 ml</span>
       </div>
@@ -81,7 +81,7 @@
       <div class="toolbar" id="sizeButtons" style="margin-bottom:16px"></div>
       <div class="metrics" id="batchMetrics"></div>
       <div class="card">
-        <h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">Costo MP por escenario (USD)</h4>
+        <h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">Costo <span class="term" data-term="mp">MP</span> por escenario (USD)</h4>
         <div id="batchBars"></div>
       </div>
     </div>
@@ -89,7 +89,7 @@
     <!-- Margen -->
     <div id="t4" class="panel">
       <div class="card">
-        <h4 style="font-size:14px;margin-bottom:16px">Simulador de margen bruto</h4>
+        <h4 style="font-size:14px;margin-bottom:16px">Simulador de <span class="term" data-term="margen">margen</span> bruto</h4>
         <div class="margin-sim">
           <div class="field">
             <label>Precio venta (USD / 100 ml)</label>
@@ -111,9 +111,9 @@
     <!-- Importación (aparte) -->
     <div id="t6" class="panel">
       <div class="card import-panel">
-        <h4 style="font-size:15px;margin-bottom:8px;font-weight:600">Costo puesto en destino (landed)</h4>
+        <h4 style="font-size:15px;margin-bottom:8px;font-weight:600">Costo puesto en destino (<span class="term" data-term="landed">landed</span>)</h4>
         <p class="note" style="margin-top:0;margin-bottom:0">
-          Las cotizaciones de proveedor son <strong>FOB</strong> (materia prima en origen).
+          Las cotizaciones de proveedor son <strong><span class="term" data-term="fob">FOB</span></strong> (materia prima en origen).
           El recargo se aplica por origen de proveedor — el mismo modelo que usan Inicio, Fórmula y Orden de compra.
         </p>
         <div class="controls-bar" style="margin-top:12px">
@@ -156,6 +156,7 @@
   <script src="./eterno-theme.js"></script>
   <script src="./eterno-store.js"></script>
   <script src="./eterno-nav.js"></script>
+  <script src="./eterno-terms.js"></script>
   <script>
     let db = EternoStore.loadDb();
     {
@@ -285,8 +286,8 @@
         <th>Cotización</th>
         <th>Proveedor</th>
         <th class="th-num">USD/kg</th>
-        <th class="th-num">Contrib. USD/kg</th>
-        <th class="th-num">MOQ</th>
+        <th class="th-num"><span class="term" data-term="contrib">Contrib.</span> USD/kg</th>
+        <th class="th-num"><span class="term" data-term="moq">MOQ</span></th>
         <th class="th-num">Mín. compra USD</th>
         <th>Origen</th>
       </tr></thead>`;
@@ -449,7 +450,7 @@
       const marginCheap = retail - (cheapUnit + pack + vari);
       const extraVsCheap = margin - marginCheap;
       document.getElementById('marginMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">COGS / 100 ml</div><div class="metric-value">$${fmt(cogsUnit)}</div><div class="metric-sub">MP (landed) + empaque + variable</div></div>
+        <div class="metric"><div class="metric-label"><span class="term" data-term="cogs">COGS</span> / 100 ml</div><div class="metric-value">$${fmt(cogsUnit)}</div><div class="metric-sub">MP (landed) + empaque + variable</div></div>
         <div class="metric"><div class="metric-label">Margen bruto / unidad</div><div class="metric-value" style="color:${margin >= 0 ? 'var(--accent)' : 'var(--err)'}">$${fmt(margin)}</div><div class="metric-sub">${fmt(marginPct, 1)}% sobre PVP $${fmt(retail)}</div></div>
         <div class="metric"><div class="metric-label">MP sola (landed)</div><div class="metric-value">$${fmt(mpUnit)}</div><div class="metric-sub">${(kg * 1000).toFixed(0)} g por unidad</div></div>
         <div class="metric"><div class="metric-label">Δ vs más barato posible</div><div class="metric-value" style="color:${extraVsCheap >= 0 ? 'var(--muted)' : 'var(--err)'}">$${fmt(extraVsCheap)}</div><div class="metric-sub">diferencia de margen por unidad</div></div>
@@ -526,6 +527,7 @@
       const active = document.querySelector('.panel.active');
       if (active?.id === 't2') renderBatch();
       if (active?.id === 't6') renderImport();
+      if (window.EternoTerms) EternoTerms.enhance();
     }
 
     function bindControls() {

@@ -57,7 +57,7 @@
 
     <div class="steps no-print">
       <div class="step active"><div class="step-num">1</div><div><div class="step-title">Revisar picks</div><div class="step-sub">Proveedor y precio por ingrediente</div></div></div>
-      <div class="step active"><div class="step-num">2</div><div><div class="step-title">Ajustar margen / MOQ</div><div class="step-sub">Lote, seguridad, tasa COP</div></div></div>
+      <div class="step active"><div class="step-num">2</div><div><div class="step-title">Ajustar margen / <span class="term" data-term="moq">MOQ</span></div><div class="step-sub">Lote, seguridad, tasa COP</div></div></div>
       <div class="step active"><div class="step-num">3</div><div><div class="step-title">Orden por proveedor</div><div class="step-sub">Documento listo para imprimir</div></div></div>
     </div>
 
@@ -134,6 +134,7 @@
   <script src="./eterno-theme.js"></script>
   <script src="./eterno-store.js"></script>
   <script src="./eterno-nav.js"></script>
+  <script src="./eterno-terms.js"></script>
   <script>
     if (!window.EternoStore) {
       document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif">No se encontró <code>eterno-store.js</code>. Verifica la ruta.</div>';
@@ -276,7 +277,7 @@
         <div class="metric"><div class="metric-label">Total orden</div><div class="metric-value">${usd(grand)}</div><div class="metric-sub">${EternoStore.formatCop(grand, copRate)} COP</div></div>
         <div class="metric"><div class="metric-label">Ingredientes cubiertos</div><div class="metric-value">${covered}/${db.formula.length}</div><div class="metric-sub">${missingCount ? missingCount + ' sin cotización' : 'completo'}</div></div>
         <div class="metric"><div class="metric-label">Unidades del lote</div><div class="metric-value">${Math.floor(unitsLote)}</div><div class="metric-sub">${mlUnit} ml · densidad ${density} g/ml</div></div>
-        <div class="metric"><div class="metric-label">Costo MP / unidad</div><div class="metric-value">${usd(cogUnit)}</div><div class="metric-sub">solo materia prima</div></div>
+        <div class="metric"><div class="metric-label">Costo <span class="term" data-term="mp">MP</span> / unidad</div><div class="metric-value">${usd(cogUnit)}</div><div class="metric-sub">solo materia prima</div></div>
       `;
 
       renderProviderDocs(byProvider, copRate, batchG);

@@ -58,11 +58,11 @@
             <th>Proveedor</th>
             <th style="text-align:center">Moneda</th>
             <th class="th-num sortable" data-sort="price">USD/kg <span class="sort-arrow">▾</span></th>
-            <th class="th-num sortable" data-sort="landed">Landed <span class="sort-arrow">▾</span></th>
-            <th class="th-num sortable" data-sort="moq">MOQ <span class="sort-arrow">▾</span></th>
+            <th class="th-num sortable" data-sort="landed"><span class="term" data-term="landed">Landed</span> <span class="sort-arrow">▾</span></th>
+            <th class="th-num sortable" data-sort="moq"><span class="term" data-term="moq">MOQ</span> <span class="sort-arrow">▾</span></th>
             <th class="th-num sortable" data-sort="leadTimeDays">Lead time <span class="sort-arrow">▾</span></th>
             <th class="sortable" data-sort="validUntil">Vencimiento <span class="sort-arrow">▾</span></th>
-            <th style="text-align:center">Spec</th>
+            <th style="text-align:center"><span class="term" data-term="spec">Spec</span></th>
             <th style="text-align:center">Estado</th>
             <th style="text-align:center">Acc.</th>
           </tr>
@@ -163,7 +163,7 @@
         </select>
       </div>
       <div class="field">
-        <label>Compatibilidad base anhidra</label>
+        <label>Compatibilidad base <span class="term" data-term="anhidro">anhidra</span></label>
         <select id="fCompat">
           <option value="pending">Pendiente</option>
           <option value="yes">Sí compatible</option>
@@ -185,6 +185,7 @@
   <script src="./eterno-theme.js"></script>
   <script src="./eterno-store.js"></script>
   <script src="./eterno-nav.js"></script>
+  <script src="./eterno-terms.js"></script>
   <script>
     let db = EternoStore.loadDb();
     let editId = null;
