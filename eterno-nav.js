@@ -20,17 +20,23 @@
 
   const esc = global.EternoStore.esc;
 
-  function buildNav() {
+  function buildNav(mount) {
     const file = currentFile();
     const active = PAGES.find(p => p.href.toLowerCase() === file) || PAGES[0];
     const links = PAGES.map(p =>
       `<a href="${p.href}"${p.href.toLowerCase() === file ? ' class="active"' : ''}>${p.label}</a>`
     ).join('');
+    // Toggle solo si EternoTheme está cargado y la página no trae uno propio
+    // fuera del mount (el de un render previo dentro del mount se reemplaza).
+    const existingToggle = document.getElementById('themeToggle');
+    const themeBtn = (global.EternoTheme && !(existingToggle && !mount.contains(existingToggle)))
+      ? '<button type="button" class="theme-toggle" id="themeToggle" aria-label="Cambiar tema">◐</button>'
+      : '';
 
     return `
       <nav class="app-nav">
         <div class="brand">Eterno Labs <span>${esc(active.sub)}</span></div>
-        <div class="nav-links">${links}</div>
+        <div class="nav-links">${links}${themeBtn}</div>
         <div class="nav-actions">
           <span id="ternoStatusPill"></span>
           <button type="button" class="btn btn-sm" id="ternoBtnExport">Exportar respaldo</button>
@@ -115,6 +121,22 @@
     }
   }
 
+  function syncThemeToggle() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    btn.textContent = document.documentElement.dataset.theme === 'dark' ? '☀' : '☾';
+  }
+
+  function bindThemeToggle() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn || !global.EternoTheme) return;
+    btn.onclick = () => global.EternoTheme.toggle();
+    syncThemeToggle();
+  }
+
+  // Una sola vez por página; sobrevive a reconstrucciones de la nav
+  document.addEventListener('eterno:themechange', syncThemeToggle);
+
   function bindActions() {
     const btnExport = document.getElementById('ternoBtnExport');
     const btnImport = document.getElementById('ternoBtnImport');
@@ -131,11 +153,12 @@
   function init() {
     const mount = document.getElementById('nav-mount');
     if (!mount || !global.EternoStore) return;
-    mount.innerHTML = buildNav();
+    mount.innerHTML = buildNav(mount);
     renderStatusPill();
     renderBackupReminder();
     renderUnitWarningBanner();
     bindActions();
+    bindThemeToggle();
   }
 
   if (document.readyState === 'loading') {
