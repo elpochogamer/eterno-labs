@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Eterno Labs — Decisión de compra (USD)</title>
+  <script>(function(){try{var t=localStorage.getItem('eterno_theme')||'auto';var d=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();</script>
   <link rel="stylesheet" href="./eterno-ui.css">
 </head>
 <body>
@@ -170,6 +171,7 @@
     </div>
   </div>
 
+  <script src="./eterno-theme.js"></script>
   <script src="./eterno-store.js"></script>
   <script src="./eterno-nav.js"></script>
   <script>
@@ -498,8 +500,8 @@
       `;
       const max = Math.max(t.cheap * kg, t.picks * kg, 0.0001);
       document.getElementById('batchBars').innerHTML = `
-        <div class="bar-row"><span class="bar-label">Más barato</span><span class="bar-track"><span class="bar-fill" style="width:${(t.cheap * kg / max * 100).toFixed(1)}%;background:#5cb87a"></span></span><span class="bar-val">$${fmt(t.cheap * kg)}</span></div>
-        <div class="bar-row"><span class="bar-label">Selección actual</span><span class="bar-track"><span class="bar-fill" style="width:${(t.picks * kg / max * 100).toFixed(1)}%;background:#6b9fd4"></span></span><span class="bar-val">$${fmt(t.picks * kg)}</span></div>
+        <div class="bar-row"><span class="bar-label">Más barato</span><span class="bar-track"><span class="bar-fill" style="width:${(t.cheap * kg / max * 100).toFixed(1)}%;background:var(--bar-cheap)"></span></span><span class="bar-val">$${fmt(t.cheap * kg)}</span></div>
+        <div class="bar-row"><span class="bar-label">Selección actual</span><span class="bar-track"><span class="bar-fill" style="width:${(t.picks * kg / max * 100).toFixed(1)}%;background:var(--bar-picks)"></span></span><span class="bar-val">$${fmt(t.picks * kg)}</span></div>
       `;
     }
 
