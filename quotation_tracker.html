@@ -19,6 +19,7 @@
       <div class="toolbar">
         <button type="button" class="btn btn-primary" id="btnAdd">+ Cotización</button>
         <button type="button" class="btn" id="btnExportCsv">CSV</button>
+        <button type="button" class="btn btn-danger" id="btnWipe">Vaciar cotizaciones</button>
       </div>
     </header>
 
@@ -178,6 +179,26 @@
       <div class="modal-actions">
         <button type="button" class="btn" id="btnCancel">Cancelar</button>
         <button type="button" class="btn btn-primary" id="btnSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="wipeModal">
+    <div class="modal" style="max-width:460px" onclick="event.stopPropagation()">
+      <h3>Vaciar cotizaciones</h3>
+      <p style="font-size:13px;line-height:1.6;margin-top:8px" id="wipeCount"></p>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6">La fórmula y los ajustes se conservan.</p>
+      <div class="field" style="margin-top:12px">
+        <button type="button" class="btn" id="btnWipeBackup">1. Descargar backup JSON</button>
+        <p class="note" id="wipeBackupNote" style="margin-top:6px">Obligatorio: hasta descargar el backup no puedes confirmar.</p>
+      </div>
+      <div class="field">
+        <label>2. Escribe VACIAR para habilitar el borrado</label>
+        <input type="text" id="wipeConfirmInput" autocomplete="off" placeholder="VACIAR" disabled>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btnWipeCancel">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnWipeGo" disabled>Vaciar cotizaciones</button>
       </div>
     </div>
   </div>
@@ -458,6 +479,59 @@
       a.download = 'eterno_cotizaciones.csv';
       a.click();
       URL.revokeObjectURL(a.href);
+    };
+
+    // ── Vaciar cotizaciones (backup obligatorio + confirmación escrita) ────
+    let wipeBackupDone = false;
+
+    function syncWipeButton() {
+      document.getElementById('btnWipeGo').disabled =
+        !(wipeBackupDone && document.getElementById('wipeConfirmInput').value === 'VACIAR');
+    }
+
+    function openWipeModal() {
+      wipeBackupDone = false;
+      const n = db.quotations.length;
+      const m = Object.keys(db.selections || {}).length;
+      document.getElementById('wipeCount').textContent =
+        `Vas a borrar ${n} cotización(es) y ${m} selección(es).`;
+      const input = document.getElementById('wipeConfirmInput');
+      input.value = '';
+      input.disabled = true;
+      document.getElementById('btnWipeGo').disabled = true;
+      document.getElementById('wipeBackupNote').textContent =
+        'Obligatorio: hasta descargar el backup no puedes confirmar.';
+      document.getElementById('wipeModal').classList.add('open');
+    }
+
+    function closeWipeModal() {
+      document.getElementById('wipeModal').classList.remove('open');
+    }
+
+    document.getElementById('btnWipe').onclick = openWipeModal;
+    document.getElementById('btnWipeCancel').onclick = closeWipeModal;
+    document.getElementById('wipeModal').onclick = (e) => { if (e.target.id === 'wipeModal') closeWipeModal(); };
+
+    document.getElementById('btnWipeBackup').onclick = () => {
+      EternoStore.exportBackup(db);
+      wipeBackupDone = true;
+      const input = document.getElementById('wipeConfirmInput');
+      input.disabled = false;
+      document.getElementById('wipeBackupNote').textContent = 'Backup descargado ✓ — ahora escribe VACIAR.';
+      input.focus();
+      syncWipeButton();
+    };
+
+    document.getElementById('wipeConfirmInput').oninput = syncWipeButton;
+
+    document.getElementById('btnWipeGo').onclick = () => {
+      if (!wipeBackupDone || document.getElementById('wipeConfirmInput').value !== 'VACIAR') return;
+      EternoStore.wipeQuotations(db);
+      EternoStore.saveDb(db);
+      closeWipeModal();
+      populateFilterSelects();
+      renderAll();
+      EternoStore.toast('Cotizaciones vaciadas — la fórmula y los ajustes se conservan');
     };
 
     // Deep-link ?add=ingId
