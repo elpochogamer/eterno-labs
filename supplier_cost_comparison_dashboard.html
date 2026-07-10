@@ -542,6 +542,15 @@
     function renderHero() {
       const t = totals();
       const loteKg = getBatchKg();
+      let totalDes = 0, sinMoq = 0;
+      db.formula.forEach(ing => {
+        const m = EternoStore.metrics(db, ing.id, batchG);
+        if (m && m.desembolso != null) totalDes += m.desembolso;
+        else sinMoq++;
+      });
+      const ahorroSub = t.saving > 0.005
+        ? `ahorro potencial $${fmt(Math.max(t.saving, 0), 2)}/kg volviendo a automático`
+        : 'USD / kg fórmula · ya estás en el mínimo';
       document.getElementById('heroCards').innerHTML = `
         <div class="hero-main">
           <div class="hero-label">Costo MP actual · FOB · lote ${batchG} g</div>
@@ -549,8 +558,8 @@
           <div class="hero-delta">$${fmt(t.sel, 2)} USD / kg fórmula</div>
           <a class="compare-link" href="#" onclick="goImportTab();return false">Ver costo con importación →</a>
         </div>
-        <div class="scenario-card winner"><span class="sc-badge">Mínimo</span><span class="sc-label">Costo si todo al mínimo</span><div class="sc-amount">$${fmt(t.auto, 2)}</div><div class="sc-sub">USD / kg fórmula</div></div>
-        <div class="scenario-card"><span class="sc-label">Ahorro potencial</span><div class="sc-amount">$${fmt(Math.max(t.saving, 0), 2)}</div><div class="sc-sub">${t.saving > 0.005 ? 'volviendo todo a automático' : 'ya estás en el mínimo'}</div></div>
+        <div class="scenario-card winner"><span class="sc-badge">Mínimo</span><span class="sc-label">Costo si todo al mínimo</span><div class="sc-amount">$${fmt(t.auto, 2)}</div><div class="sc-sub">${ahorroSub}</div></div>
+        <div class="scenario-card"><span class="sc-label"><span class="term" data-term="desembolso">Desembolso</span> primer lote</span><div class="sc-amount">$${fmt(totalDes, 2)}</div><div class="sc-sub">lote de ${batchG} g${sinMoq ? ` · ${sinMoq} sin MOQ` : ''}</div></div>
         <div class="scenario-card"><span class="sc-label">Cobertura</span><div class="sc-amount">${t.eligibleCount}/${db.formula.length}</div><div class="sc-sub">ingredientes con cotización elegible</div></div>
       `;
     }
