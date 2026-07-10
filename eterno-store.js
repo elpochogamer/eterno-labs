@@ -319,6 +319,49 @@
     return q ? { q, source: 'auto' } : null;
   }
 
+  // ── Métricas derivadas ───────────────────────────────────────────────────
+  // Calculadas en tiempo de render a partir de la selección vigente.
+  // Nunca se persisten: batchG vive en memoria de cada página.
+  const CANON_BATCH_G = 445;   // lote canónico de la fórmula
+
+  function median(nums) {
+    const a = (nums || []).filter(Number.isFinite).sort((x, y) => x - y);
+    if (!a.length) return null;
+    const m = a.length >> 1;
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
+
+  // Outlier si se aleja más de 3× de la mediana de las elegibles del mismo
+  // ingrediente (en cualquier dirección).
+  function priceOutlier(db, q) {
+    const med = median(db.quotations
+      .filter(x => x.ingId === q.ingId && isEligible(x))
+      .map(x => x.price));
+    if (med == null || !(q.price > 0)) return false;
+    return q.price > med * 3 || q.price < med / 3;
+  }
+
+  function necesidadKg(db, ingId, batchG) {
+    const ing = db.formula.find(i => i.id === ingId);
+    if (!ing) return null;
+    const pct = (Number(ing.pct) || 0) * pctFactor(db);
+    if (pct <= 0) return null;
+    return (pct / 100) * (batchG / 1000);
+  }
+
+  // moq ausente/0/negativo/NaN → desembolso y exceso null; need null → exceso
+  // null. Nunca retorna Infinity ni NaN.
+  function metrics(db, ingId, batchG) {
+    const sel = getSelected(db, ingId);
+    if (!sel) return null;
+    const { q } = sel;
+    const need = necesidadKg(db, ingId, batchG);
+    const moq = Number(q.moq);
+    const desembolso = (moq > 0) ? moq * q.price : null;
+    const exceso = (need > 0 && moq > 0) ? moq / need : null;
+    return { ...sel, need, desembolso, exceso };
+  }
+
   function pruneSelections(db) {
     if (!db.selections) { db.selections = {}; return []; }
     const live = new Set(db.quotations.map(q => q.id));
@@ -871,6 +914,7 @@
     sumPct, pctFactor, nameToId, getIngredient, getFormula,
     getMissingIngredients, getQuotations,
     isEligible, autoPick, getSelected, pruneSelections, wipeQuotations,
+    CANON_BATCH_G, median, priceOutlier, necesidadKg, metrics,
     getSettings, updateSettings,
     addQuotation, updateQuotation, deleteQuotation, validateQuotationInput,
     getSuppliers, addSupplier, updateSupplier, matchOrCreateSupplier, findSupplierByName,
