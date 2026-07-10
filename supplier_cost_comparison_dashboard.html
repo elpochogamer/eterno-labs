@@ -273,83 +273,197 @@
         }).join('');
     }
 
-    // ── Matriz de selección: un <select> de cotizaciones por ingrediente ──
-    function optionLabel(q) {
-      return `${q.provider} — $${fmt(q.price)}/kg — MOQ ${q.moq}kg`;
+    // ── Matriz de selección: fila cabecera + panel expandible por ingrediente ──
+    const openIngs = new Set(); // paneles abiertos — solo memoria, se pierde al recargar
+
+    function fmtExceso(x) {
+      if (x == null || !isFinite(x)) return '—';
+      return (x < 10 ? x.toFixed(1) : Math.round(x).toFixed(0)) + '×';
+    }
+    function excesoClass(x) {
+      if (x == null || !isFinite(x)) return '';
+      if (x > 20) return 'exceso-danger';
+      if (x > 2) return 'exceso-mid';
+      return '';
+    }
+    function fmtMoq(m) {
+      const n = Number(m);
+      if (!(n > 0)) return '—';
+      return n % 1 ? n.toFixed(2) : n.toFixed(0);
+    }
+    function ineligibleReason(q) {
+      if (q.compat === 'no') return 'incompatible base anhidra (compat: no)';
+      if (q.unitWarning) return 'unidad ≠ kg (precio sin normalizar)';
+      if (q.status === 'descartado') return 'descartada';
+      if (q.status === 'obsoleto — fuera de fórmula') return 'obsoleta — fuera de fórmula';
+      if (EternoStore.isExpired(q)) return 'vencida';
+      return 'no elegible';
+    }
+    function supplierCountry(q) {
+      const s = (db.suppliers || []).find(x => x.id === q.supplierId);
+      return s && s.country ? s.country : null;
+    }
+    // Desembolso/exceso de cualquier cotización del panel, no solo la elegida
+    function quoteDerived(q, need) {
+      const moq = Number(q.moq);
+      const desembolso = (moq > 0) ? moq * q.price : null;
+      const exceso = (need > 0 && moq > 0) ? moq / need : null;
+      return { desembolso, exceso };
+    }
+
+    function panelHtml(r, m) {
+      const ingId = r.ing.id;
+      const qs = db.quotations.filter(q => q.ingId === ingId);
+      if (!qs.length) {
+        return `<div class="empty-state" style="padding:8px 0">
+          <div class="empty-sub" style="margin-bottom:8px">Sin cotizaciones para este ingrediente</div>
+          <a class="btn btn-sm btn-primary" href="quotation_tracker.html?add=${encodeURIComponent(ingId)}">+ Cotización</a>
+        </div>`;
+      }
+      const eligible = qs.filter(EternoStore.isEligible).sort((a, b) => a.price - b.price);
+      const ineligible = qs.filter(q => !EternoStore.isEligible(q));
+      const hasLead = eligible.some(q => q.leadTimeDays != null);
+      const isManual = r.sel && r.sel.source === 'manual';
+      const need = EternoStore.necesidadKg(db, ingId, batchG);
+
+      const optRow = (q, value, label, checked) => {
+        const d = quoteDerived(q, need);
+        const country = supplierCountry(q);
+        const outlier = EternoStore.priceOutlier(db, q)
+          ? ' <span class="badge b-warn" title="Precio fuera de rango (más de 3× la mediana)">⚠</span>' : '';
+        const rid = 'opt-' + ingId + '-' + (value === '' ? 'auto' : value);
+        return `<tr>
+          <td style="width:26px"><input type="radio" name="sel-${esc(ingId)}" id="${esc(rid)}" value="${esc(value)}" data-ing="${esc(ingId)}"${checked ? ' checked' : ''}></td>
+          <td><label for="${esc(rid)}">${label}${country ? ` <span class="ghost">· ${esc(country)}</span>` : ''}${outlier}</label></td>
+          <td class="td-num">$${fmt(q.price)}</td>
+          <td class="td-num">${fmtMoq(q.moq)}${Number(q.moq) > 0 ? ' kg' : ''}</td>
+          <td class="td-num">${d.desembolso != null ? '$' + fmt(d.desembolso) : '—'}</td>
+          <td class="td-num ${excesoClass(d.exceso)}">${fmtExceso(d.exceso)}</td>
+          <td>${esc(q.spec)}</td>
+          ${hasLead ? `<td class="td-num">${q.leadTimeDays != null ? fmt(q.leadTimeDays, 0) + ' d' : '—'}</td>` : ''}
+        </tr>`;
+      };
+
+      let optRows = '';
+      if (r.auto) {
+        optRows += optRow(r.auto, '', `↻ Automática — ${esc(r.auto.provider)} · $${fmt(r.auto.price)}/kg`, !isManual);
+      }
+      optRows += eligible.map(q => optRow(q, q.id, `<strong>${esc(q.provider)}</strong>`, !!(isManual && r.sel.q.id === q.id))).join('');
+
+      const radios = optRows
+        ? `<fieldset>
+            <legend class="sr-only">Cotización para ${esc(r.ing.name)}</legend>
+            <table class="quote-opts">
+              <thead><tr><th></th><th>Proveedor</th><th class="th-num">USD/kg</th><th class="th-num"><span class="term" data-term="moq">MOQ</span></th><th class="th-num"><span class="term" data-term="desembolso">Desembolso</span></th><th class="th-num"><span class="term" data-term="exceso">Exceso</span></th><th><span class="term" data-term="spec">Spec</span></th>${hasLead ? '<th class="th-num">Lead time</th>' : ''}</tr></thead>
+              <tbody>${optRows}</tbody>
+            </table>
+          </fieldset>`
+        : '<p class="note" style="margin-top:0">Sin cotizaciones elegibles — revisa las incompatibles abajo.</p>';
+
+      const inelig = ineligible.length
+        ? `<details class="ineligible-list">
+            <summary>Incompatibles (${ineligible.length}) — informativas, no seleccionables</summary>
+            ${ineligible.map(q => `<div class="ineligible-row"><span>${esc(q.provider)}</span><span>$${fmt(q.price)}/kg</span><span>MOQ ${fmtMoq(q.moq)} kg</span><span>${esc(ineligibleReason(q))}</span></div>`).join('')}
+          </details>`
+        : '';
+
+      const foot = [];
+      if (r.auto) foot.push(`<span>↻ auto sugiere ${esc(r.auto.provider)}</span>`);
+      const med = EternoStore.median(eligible.map(q => q.price));
+      if (med != null) foot.push(`<span>Mediana: $${fmt(med)}</span>`);
+      if (m && m.desembolso != null) {
+        const cheaper = eligible
+          .filter(q => q.id !== m.q.id)
+          .map(q => ({ q, d: quoteDerived(q, need).desembolso }))
+          .filter(x => x.d != null && x.d < m.desembolso)
+          .sort((a, b) => a.d - b.d)[0];
+        if (cheaper) {
+          foot.push(`<span class="badge b-info">${esc(cheaper.q.provider)} cuesta $${fmt(m.desembolso - cheaper.d)} menos hoy (MOQ ${fmtMoq(cheaper.q.moq)} kg)</span>`);
+        }
+      }
+
+      return radios + inelig + (foot.length ? `<div class="quote-foot">${foot.join('')}</div>` : '');
     }
 
     function renderPicksTable() {
-      const rows = getRows();
+      const rows = getRows().map(r => ({ ...r, m: EternoStore.metrics(db, r.ing.id, batchG) }));
 
       const thead = `<thead><tr>
+        <th style="width:28px"></th>
         <th>Ingrediente</th>
-        <th class="th-num">% fórmula</th>
-        <th>Cotización</th>
-        <th>Proveedor</th>
+        <th class="th-num">%</th>
+        <th>Proveedor elegido</th>
         <th class="th-num">USD/kg</th>
         <th class="th-num"><span class="term" data-term="contrib">Contrib.</span> USD/kg</th>
-        <th class="th-num"><span class="term" data-term="moq">MOQ</span></th>
-        <th class="th-num">Mín. compra USD</th>
+        <th class="th-num"><span class="term" data-term="desembolso">Desembolso</span></th>
+        <th class="th-num"><span class="term" data-term="exceso">Exceso</span></th>
         <th>Origen</th>
       </tr></thead>`;
 
       let totalContrib = 0;
       const tbodyRows = rows.map(r => {
         totalContrib += r.contrib ?? 0;
-        const qs = db.quotations.filter(q => q.ingId === r.ing.id);
-        const eligible = qs.filter(EternoStore.isEligible).sort((a, b) => a.price - b.price);
-        const ineligible = qs.filter(q => !EternoStore.isEligible(q));
-
-        const autoLabel = r.auto ? `↻ Automática (${r.auto.provider} · $${fmt(r.auto.price)})` : '↻ Automática (sin elegible)';
-        const isManual = r.sel && r.sel.source === 'manual';
-        const opts =
-          `<option value=""${isManual ? '' : ' selected'}>${esc(autoLabel)}</option>` +
-          eligible.map(q => `<option value="${q.id}"${isManual && r.sel.q.id === q.id ? ' selected' : ''}>${esc(optionLabel(q))}</option>`).join('') +
-          (ineligible.length
-            ? `<optgroup label="Incompatibles" disabled>${ineligible.map(q => `<option value="${q.id}">${esc(optionLabel(q))}</option>`).join('')}</optgroup>`
-            : '');
-
-        const selCell = qs.length
-          ? `<select data-sel="${r.ing.id}" class="inp" style="max-width:280px">${opts}</select>`
-          : '<span style="color:var(--muted);font-size:12px">Sin cotizaciones</span>';
-
+        const open = openIngs.has(r.ing.id);
+        const exceso = r.m ? r.m.exceso : null;
+        const desembolso = r.m && r.m.desembolso != null ? '$' + fmt(r.m.desembolso) : '—';
         const origen = r.sel
           ? (r.sel.source === 'manual' ? '<span class="badge b-ao">manual</span>' : '<span class="badge b-carrier">↻ auto</span>')
           : '—';
-        const minBuy = r.sel && r.sel.q.moq ? r.sel.q.price * r.sel.q.moq : null;
 
-        return `<tr>
+        return `<tr class="row-head" data-row="${esc(r.ing.id)}">
+          <td><button type="button" class="chev-btn" data-toggle="${esc(r.ing.id)}" aria-expanded="${open}" aria-controls="panel-${esc(r.ing.id)}" aria-label="Cotizaciones de ${esc(r.ing.name)}"><span class="chev">▸</span></button></td>
           <td><strong>${esc(r.ing.name)}</strong><div style="font-size:11px;color:var(--muted)">${esc(r.ing.inci)}</div></td>
           <td class="td-num">${(r.pct * 100).toFixed(2)}%</td>
-          <td>${selCell}</td>
           <td>${r.sel ? esc(r.sel.q.provider) : '—'}</td>
           <td class="td-num">${r.price != null ? '$' + fmt(r.price) : '—'}</td>
           <td class="td-num">${r.contrib != null ? '$' + fmt(r.contrib, 3) : '—'}</td>
-          <td class="td-num">${r.sel ? r.sel.q.moq + ' kg' : '—'}</td>
-          <td class="td-num">${minBuy != null ? '$' + fmt(minBuy) : '—'}</td>
+          <td class="td-num">${desembolso}</td>
+          <td class="td-num ${excesoClass(exceso)}">${fmtExceso(exceso)}</td>
           <td>${origen}</td>
+        </tr>
+        <tr id="panel-${esc(r.ing.id)}" class="quote-panel" role="region" aria-label="Cotizaciones de ${esc(r.ing.name)}"${open ? '' : ' hidden'}>
+          <td colspan="9">${panelHtml(r, r.m)}</td>
         </tr>`;
       }).join('');
 
       const totalRow = `<tr style="background:var(--surface2);font-weight:600">
-        <td>TOTAL MATERIA PRIMA (USD/kg fórmula)</td><td></td><td></td><td></td><td></td>
+        <td></td><td>TOTAL MATERIA PRIMA (USD/kg fórmula)</td><td></td><td></td><td></td>
         <td class="td-num">$${fmt(totalContrib, 3)}</td><td></td><td></td><td></td>
       </tr>`;
 
       document.getElementById('picksTableWrap').innerHTML = `<table>${thead}<tbody>${tbodyRows}${totalRow}</tbody></table>`;
-
-      document.querySelectorAll('[data-sel]').forEach(sel => {
-        sel.onchange = () => {
-          if (sel.value === '') delete db.selections[sel.dataset.sel];
-          else db.selections[sel.dataset.sel] = sel.value;
-          EternoStore.saveDb(db);
-          renderAll();
-        };
-      });
+      bindPicksTable();
 
       document.getElementById('tableNote').textContent =
         'Precios FOB en USD/kg. "↻ Automática" sigue siempre a la cotización elegible más barata; elige una específica para fijarla. Última sync: ' +
         (db.meta.updatedAt || '').replace('T', ' ').slice(0, 16);
+    }
+
+    function togglePanel(ingId) {
+      const willOpen = !openIngs.has(ingId);
+      if (willOpen) openIngs.add(ingId); else openIngs.delete(ingId);
+      const panel = document.getElementById('panel-' + ingId);
+      const btn = document.querySelector(`.chev-btn[data-toggle="${ingId}"]`);
+      if (panel) panel.hidden = !willOpen;
+      if (btn) btn.setAttribute('aria-expanded', String(willOpen));
+    }
+
+    function bindPicksTable() {
+      const wrap = document.getElementById('picksTableWrap');
+      wrap.querySelectorAll('.chev-btn').forEach(b => {
+        b.onclick = e => { e.stopPropagation(); togglePanel(b.dataset.toggle); };
+      });
+      wrap.querySelectorAll('tr.row-head').forEach(tr => {
+        tr.onclick = () => togglePanel(tr.dataset.row);
+      });
+      wrap.querySelectorAll('input[type="radio"][data-ing]').forEach(rb => {
+        rb.onchange = () => {
+          if (rb.value === '') delete db.selections[rb.dataset.ing];
+          else db.selections[rb.dataset.ing] = rb.value;
+          EternoStore.saveDb(db);
+          renderAll();
+        };
+      });
     }
 
     function renderProviderCards() {

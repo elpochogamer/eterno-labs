@@ -732,6 +732,82 @@ input[type="file"] { display: none; }
   .app-nav { flex-direction: column; align-items: stretch; }
 }
 
+/* ── Filas expandibles del comparador ────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+tr.row-head { cursor: pointer; }
+.chev-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-family: var(--font);
+  line-height: 1;
+}
+.chev-btn:hover { color: var(--text); background: var(--surface2); }
+.chev-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chev { display: inline-block; transition: transform 0.15s ease; }
+.chev-btn[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.exceso-mid { color: var(--muted); }
+.exceso-danger { color: var(--err); font-weight: 600; }
+tr.quote-panel > td {
+  background: var(--surface2);
+  padding: 14px 18px 16px 40px;
+}
+tr.quote-panel:hover > td { background: var(--surface2); }
+.quote-panel fieldset { border: none; margin: 0; padding: 0; }
+.quote-opts { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.quote-opts th {
+  background: transparent;
+  position: static;
+  border-bottom: 1px solid var(--border2);
+  padding: 6px 10px;
+}
+.quote-opts td {
+  padding: 7px 10px;
+  border-bottom: 1px dashed var(--border);
+  background: transparent;
+}
+.quote-opts tr:last-child td { border-bottom: none; }
+.quote-opts label { cursor: pointer; }
+.quote-opts input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+.quote-foot {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+  display: flex;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ineligible-list { margin-top: 10px; }
+.ineligible-list summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+.ineligible-row {
+  color: var(--dim);
+  font-size: 12px;
+  display: flex;
+  gap: 6px 14px;
+  padding: 5px 10px;
+  border-bottom: 1px dashed var(--border);
+  flex-wrap: wrap;
+}
+.ineligible-row:last-child { border-bottom: none; }
+
 /* ── Glosario de términos (eterno-terms.js) ─────────────────────────────── */
 .term {
   text-decoration: underline dotted;

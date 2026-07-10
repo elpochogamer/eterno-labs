@@ -21,6 +21,8 @@
     anhidro: 'Formulación sin agua. Solo admite ingredientes oil-soluble.',
     inci: 'International Nomenclature of Cosmetic Ingredients. Nomenclatura obligatoria en etiqueta.',
     contrib: 'Contribución = precio USD/kg × % normalizado. Lo que ese ingrediente aporta al costo de un kg de fórmula.',
+    desembolso: 'Dinero que sale de caja al hacer el pedido: MOQ × precio USD/kg. Incluye el material sobrante que impone el mínimo del proveedor — no es el costo de la fórmula.',
+    exceso: 'Cuántas veces el MOQ del proveedor supera lo que el lote realmente necesita (MOQ ÷ necesidad). 1× = compras justo lo que usas; 100× = compras cien veces tu necesidad.',
   };
 
   const POPOVER_ID = 'eterno-term-popover';
