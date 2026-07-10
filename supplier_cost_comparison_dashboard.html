@@ -37,6 +37,10 @@
         <input type="number" id="batchG" value="445" min="1" step="5" style="width:90px">
         <span class="note" style="margin:0">g</span>
       </div>
+      <div class="control-group" role="group" aria-label="Modo de vista">
+        <button type="button" class="btn btn-sm mode-btn btn-primary" data-mode="costo">Costo de fórmula</button>
+        <button type="button" class="btn btn-sm mode-btn" data-mode="desembolso">Desembolso primer lote</button>
+      </div>
       <div class="control-group">
         <label>Tasa COP/USD</label>
         <input type="number" id="copRateD" min="1" step="50" style="width:110px">
@@ -166,6 +170,9 @@
     // Tamaño de lote en gramos — única fuente de verdad de la página.
     // Solo memoria: no se guarda en db ni en localStorage.
     let batchG = EternoStore.CANON_BATCH_G;
+    // Modo de la matriz: 'costo' (contribución USD/kg) o 'desembolso'
+    // (MOQ × precio del primer lote). Solo memoria; recargar vuelve a 'costo'.
+    let viewMode = 'costo';
 
     const esc = EternoStore.esc;
     const fmt = EternoStore.fmt;
@@ -387,6 +394,11 @@
 
     function renderPicksTable() {
       const rows = getRows().map(r => ({ ...r, m: EternoStore.metrics(db, r.ing.id, batchG) }));
+      if (viewMode === 'desembolso') {
+        rows.sort((a, b) => ((b.m && b.m.desembolso) ?? -1) - ((a.m && a.m.desembolso) ?? -1));
+      } else {
+        rows.sort((a, b) => (b.contrib ?? -1) - (a.contrib ?? -1));
+      }
 
       const thead = `<thead><tr>
         <th style="width:28px"></th>
@@ -426,10 +438,24 @@
         </tr>`;
       }).join('');
 
-      const totalRow = `<tr style="background:var(--surface2);font-weight:600">
-        <td></td><td>TOTAL MATERIA PRIMA (USD/kg fórmula)</td><td></td><td></td><td></td>
-        <td class="td-num">$${fmt(totalContrib, 3)}</td><td></td><td></td><td></td>
-      </tr>`;
+      let totalRow;
+      if (viewMode === 'desembolso') {
+        let totalDes = 0, sinMoq = 0;
+        rows.forEach(r => {
+          if (r.m && r.m.desembolso != null) totalDes += r.m.desembolso;
+          else sinMoq++;
+        });
+        const nota = sinMoq ? ` (${sinMoq} ingrediente${sinMoq > 1 ? 's' : ''} sin MOQ)` : '';
+        totalRow = `<tr style="background:var(--surface2);font-weight:600">
+          <td></td><td>DESEMBOLSO TOTAL PRIMER LOTE (USD)${esc(nota)}</td><td></td><td></td><td></td><td></td>
+          <td class="td-num">$${fmt(totalDes)}</td><td></td><td></td>
+        </tr>`;
+      } else {
+        totalRow = `<tr style="background:var(--surface2);font-weight:600">
+          <td></td><td>TOTAL MATERIA PRIMA (USD/kg fórmula)</td><td></td><td></td><td></td>
+          <td class="td-num">$${fmt(totalContrib, 3)}</td><td></td><td></td><td></td>
+        </tr>`;
+      }
 
       document.getElementById('picksTableWrap').innerHTML = `<table>${thead}<tbody>${tbodyRows}${totalRow}</tbody></table>`;
       bindPicksTable();
@@ -646,6 +672,14 @@
     }
 
     function bindControls() {
+      document.querySelectorAll('.mode-btn').forEach(b => {
+        b.onclick = () => {
+          if (viewMode === b.dataset.mode) return;
+          viewMode = b.dataset.mode;
+          document.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('btn-primary', x.dataset.mode === viewMode));
+          renderAll();
+        };
+      });
       document.getElementById('batchG').oninput = e => {
         const v = +e.target.value;
         batchG = (v >= 1) ? v : EternoStore.CANON_BATCH_G;
