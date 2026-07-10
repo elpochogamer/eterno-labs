@@ -33,8 +33,9 @@
 
     <div class="controls-bar">
       <div class="control-group">
-        <label>Lote (kg)</label>
-        <input type="number" id="loteKg" min="0.1" step="0.5" value="10" style="width:90px">
+        <label for="batchG">Tamaño de lote</label>
+        <input type="number" id="batchG" value="445" min="1" step="5" style="width:90px">
+        <span class="note" style="margin:0">g</span>
       </div>
       <div class="control-group">
         <label>Tasa COP/USD</label>
@@ -78,7 +79,6 @@
 
     <!-- Lotes -->
     <div id="t2" class="panel">
-      <div class="toolbar" id="sizeButtons" style="margin-bottom:16px"></div>
       <div class="metrics" id="batchMetrics"></div>
       <div class="card">
         <h4 style="font-size:13px;margin-bottom:12px;color:var(--muted)">Costo <span class="term" data-term="mp">MP</span> por escenario (USD)</h4>
@@ -163,12 +163,14 @@
       const pruned = EternoStore.consumePrunedSelections();
       if (pruned.length) EternoStore.toast(`${pruned.length} selección(es) volvieron a automático (cotización eliminada)`);
     }
-    let batchMl = 100;
+    // Tamaño de lote en gramos — única fuente de verdad de la página.
+    // Solo memoria: no se guarda en db ni en localStorage.
+    let batchG = EternoStore.CANON_BATCH_G;
 
     const esc = EternoStore.esc;
     const fmt = EternoStore.fmt;
 
-    function getLoteKg() { return +document.getElementById('loteKg').value || 10; }
+    function getBatchKg() { return batchG / 1000; }
     function getCopRate() { return +document.getElementById('copRateD').value || db.settings.fxRate || EternoStore.DEFAULT_FX_RATE; }
 
     // ── Filas de la matriz: una por ingrediente, con la selección vigente ──
@@ -231,7 +233,7 @@
           <div class="ic-name">${esc(r.ing.name)} <span class="badge ${stBadge.cls}" style="float:right">${stBadge.label}</span></div>
           <div class="ic-inci">${esc(r.ing.inci)}</div>
           <div class="ic-row"><span>Selección ${srcBadge}</span><span><strong>${esc(r.sel.q.provider)}</strong> — $${fmt(r.price)}/kg</span></div>
-          <div class="ic-row"><span>Costo en lote (${EternoStore.DEFAULT_BATCH_G} g)</span><span>$${fmt(r.contrib * EternoStore.DEFAULT_BATCH_G / 1000)}</span></div>
+          <div class="ic-row"><span>Costo en lote (${batchG} g)</span><span>$${fmt(r.contrib * getBatchKg())}</span></div>
           ${altRow}
           <div style="margin-top:10px"><a class="compare-link" href="quotation_tracker.html?add=${encodeURIComponent(r.ing.id)}">+ Agregar otra cotización</a></div>
         </div>`;
@@ -241,7 +243,6 @@
     // ── Resumen de costo + desglose % (barras CSS) ─────────────────────────
     function renderCostSummary() {
       const rows = getRows();
-      const batchG = db.settings.batchSizeG || EternoStore.DEFAULT_BATCH_G;
       const mlUnit = db.settings.mlPerUnit || 30;
       const density = db.settings.density || 0.92;
       let batchTotal = 0;
@@ -353,7 +354,7 @@
 
     function renderProviderCards() {
       const rows = getRows();
-      const loteKg = getLoteKg();
+      const loteKg = getBatchKg();
       const copRate = getCopRate();
       const byProv = {};
       rows.forEach(r => {
@@ -373,7 +374,7 @@
           <div class="sc-sub">${byProv[p].lines} ingrediente(s) · ${EternoStore.formatCop(byProv[p].total, copRate)} COP</div>
         </div>`).join('');
       document.getElementById('providerCards').innerHTML = `
-        <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px">RESUMEN POR PROVEEDOR — LOTE ${loteKg} KG</h4>
+        <h4 style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px">RESUMEN POR PROVEEDOR — LOTE ${batchG} G</h4>
         <div style="display:flex;flex-wrap:wrap;gap:12px">${cards}
           <div class="scenario-card winner" style="flex:1;min-width:180px">
             <span class="sc-badge">Total</span><span class="sc-label">Todas las órdenes</span>
@@ -385,14 +386,14 @@
 
     function renderProcList() {
       const rows = getRows();
-      const loteKg = getLoteKg();
+      const loteKg = getBatchKg();
       const t = totals();
       const kg100 = 100 * db.settings.density / 1000;
 
       document.getElementById('procList').innerHTML = rows
         .filter(r => r.sel && r.contrib != null)
         .sort((a, b) => (b.contrib ?? 0) - (a.contrib ?? 0))
-        .map(r => `<li><span><span class="badge b-carrier">${esc(r.sel.q.provider)}</span> ${esc(r.ing.name)}</span><span class="td-num">$${fmt(r.contrib * loteKg)} / ${loteKg}kg</span></li>`).join('');
+        .map(r => `<li><span><span class="badge b-carrier">${esc(r.sel.q.provider)}</span> ${esc(r.ing.name)}</span><span class="td-num">$${fmt(r.contrib * loteKg)} / lote ${batchG} g</span></li>`).join('');
 
       document.getElementById('procTotal').innerHTML =
         `Costo MP por 100 ml (FOB): <strong>$${fmt(t.sel * kg100)}</strong> — <a href="#" onclick="goImportTab();return false">calcular con importación</a>`;
@@ -400,10 +401,10 @@
 
     function renderHero() {
       const t = totals();
-      const loteKg = getLoteKg();
+      const loteKg = getBatchKg();
       document.getElementById('heroCards').innerHTML = `
         <div class="hero-main">
-          <div class="hero-label">Costo MP actual · FOB · lote ${loteKg} kg</div>
+          <div class="hero-label">Costo MP actual · FOB · lote ${batchG} g</div>
           <div class="hero-amount">$${fmt(t.sel * loteKg, 2)}<span> USD</span></div>
           <div class="hero-delta">$${fmt(t.sel, 2)} USD / kg fórmula</div>
           <a class="compare-link" href="#" onclick="goImportTab();return false">Ver costo con importación →</a>
@@ -459,9 +460,9 @@
 
     function renderBatch() {
       const t = totals();
-      const kg = batchMl * db.settings.density / 1000;
+      const kg = getBatchKg();
       document.getElementById('batchMetrics').innerHTML = `
-        <div class="metric"><div class="metric-label">Lote ${batchMl} ml</div><div class="metric-value">${kg.toFixed(3)} kg</div><div class="metric-sub">Densidad ${db.settings.density} g/ml</div></div>
+        <div class="metric"><div class="metric-label">Lote ${batchG} g</div><div class="metric-value">${kg.toFixed(3)} kg</div><div class="metric-sub">se ajusta en "Tamaño de lote"</div></div>
         <div class="metric"><div class="metric-label">Selección actual FOB</div><div class="metric-value">$${fmt(t.sel * kg)}</div><div class="metric-sub">Δ $${fmt((t.sel - t.auto) * kg)} vs mínimo</div></div>
         <div class="metric"><div class="metric-label">Más barato posible</div><div class="metric-value">$${fmt(t.auto * kg)}</div><div class="metric-sub">mismo volumen</div></div>
         <div class="metric"><div class="metric-label">Con importación</div><div class="metric-value" style="color:var(--accent)">$${fmt(t.selL * kg)}</div><div class="metric-sub"><a href="#" onclick="goImportTab();return false" style="font-size:12px">según proveedor · ajustar</a></div></div>
@@ -531,7 +532,11 @@
     }
 
     function bindControls() {
-      document.getElementById('loteKg').oninput = renderAll;
+      document.getElementById('batchG').oninput = e => {
+        const v = +e.target.value;
+        batchG = (v >= 1) ? v : EternoStore.CANON_BATCH_G;
+        renderAll();
+      };
       document.getElementById('copRateD').oninput = renderAll;
       const syncRetail = (v) => {
         document.getElementById('retailPrice').value = v;
@@ -555,20 +560,6 @@
       document.getElementById('packCost').oninput = renderMargin;
       document.getElementById('varCost').oninput = renderMargin;
     }
-
-    [100, 500, 1000, 5000].forEach(ml => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn' + (ml === 100 ? ' btn-primary' : '');
-      b.textContent = ml + ' ml';
-      b.onclick = () => {
-        batchMl = ml;
-        document.querySelectorAll('#sizeButtons .btn').forEach(x => x.classList.remove('btn-primary'));
-        b.classList.add('btn-primary');
-        renderBatch();
-      };
-      document.getElementById('sizeButtons').appendChild(b);
-    });
 
     document.querySelectorAll('.tab').forEach(tab => {
       tab.onclick = () => {
